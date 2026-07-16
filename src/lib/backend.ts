@@ -29,6 +29,24 @@ export async function signIn(email: string, password: string) {
   return profile
 }
 
+export async function requestPasswordReset(email: string) {
+  const { error } = await client().auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
+  if (error) throw error
+}
+
+export async function resetPassword(password: string) {
+  const { data: sessionData, error: sessionError } = await client().auth.getSession()
+  if (sessionError) throw sessionError
+  if (!sessionData.session) throw new Error('비밀번호 재설정 링크가 만료되었거나 유효하지 않습니다.')
+
+  const { error } = await client().auth.updateUser({ password })
+  if (error) throw error
+
+  await client().auth.signOut()
+}
+
 export async function signUp(input: { email: string; password: string; name: string; phone: string; building: string; unit: string }) {
   const { data, error } = await client().auth.signUp({
     email: input.email,
