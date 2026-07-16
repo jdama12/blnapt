@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, signIn, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, requestPasswordReset, signIn, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -190,6 +190,7 @@ export function mountApartmentPrototype(
               <label>비밀번호</label>
               <input class="control" type="password" id="loginPassword" placeholder="비밀번호" required />
             </div>
+            <div class="auth-help"><button class="auth-link-button" id="forgotPasswordBtn" type="button">비밀번호를 잊으셨나요?</button></div>
             <button class="btn btn-primary btn-block" type="submit">로그인</button>
           </form>
           <div class="demo-box">회원가입 후 이메일 확인과 관리자의 가입 승인이 필요합니다.</div>
@@ -239,6 +240,22 @@ export function mountApartmentPrototype(
       }
   
       function bindLogin() {
+        document.getElementById("forgotPasswordBtn").addEventListener("click", async e => {
+          const button = e.currentTarget;
+          const emailInput = document.getElementById("loginEmail");
+          const email = emailInput.value.trim() || window.prompt("가입한 이메일을 입력하세요.", "")?.trim();
+          if (!email) return;
+          button.disabled = true;
+          try {
+            await requestPasswordReset(email);
+            toast("비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해 주세요.");
+          } catch (error) {
+            handleError(error, "비밀번호 재설정 메일을 보내지 못했습니다.");
+          } finally {
+            button.disabled = false;
+          }
+        });
+
         document.getElementById("loginForm").addEventListener("submit", async e => {
           e.preventDefault();
           const submitButton = e.submitter;

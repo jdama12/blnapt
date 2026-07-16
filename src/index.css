@@ -116,6 +116,10 @@
     }
     .auth-card h2 { margin: 0 0 8px; font-size: 28px; }
     .auth-card .lead { margin: 0 0 24px; color: var(--muted); }
+    .auth-help { display: flex; justify-content: flex-end; margin: -7px 0 14px; }
+    .auth-link-button { padding: 0; border: 0; color: var(--primary); background: transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .auth-link-button:hover { text-decoration: underline; }
+    .auth-link-button:disabled { opacity: .55; cursor: wait; }
     .auth-tabs {
       display: grid; grid-template-columns: 1fr 1fr;
       background: #eef2f7; padding: 4px; border-radius: 12px; margin-bottom: 22px;
