@@ -1,22 +1,28 @@
-import { useEffect, useRef } from 'react'
-import { mountApartmentPrototype } from './apartmentPrototype'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import AdminPage from './pages/AdminPage'
+import ComplaintsPage from './pages/ComplaintsPage'
+import DashboardPage from './pages/DashboardPage'
+import FeesPage from './pages/FeesPage'
+import LoginPage from './pages/LoginPage'
+import MyPage from './pages/MyPage'
+import NoticesPage from './pages/NoticesPage'
 
 function App() {
-  const appRef = useRef<HTMLDivElement>(null)
-  const modalRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!appRef.current || !modalRef.current) return
-
-    return mountApartmentPrototype(appRef.current, modalRef.current)
-  }, [])
-
   return (
-    <>
-      <div ref={appRef} className="app-shell" />
-      <div ref={modalRef} />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/complaints" element={<ComplaintsPage />} />
+        <Route path="/notices" element={<NoticesPage />} />
+        <Route path="/fees" element={<FeesPage />} />
+        <Route path="/mypage" element={<MyPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
       <div id="toast" className="toast" role="status" aria-live="polite" />
-    </>
+    </BrowserRouter>
   )
 }
 

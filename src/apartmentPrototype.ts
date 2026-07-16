@@ -3,9 +3,13 @@
 // module preserves all interactions while screens can be migrated incrementally.
 // @ts-nocheck
 
+import type { AppRoute } from './routes'
+
 export function mountApartmentPrototype(
   appRoot: HTMLElement,
   modalRootElement: HTMLElement,
+  initialRoute: AppRoute,
+  onNavigate: (route: AppRoute, options?: { replace?: boolean }) => void,
 ) {
       const STATUS = {
         pending: { label: "접수대기", className: "status-pending", progress: 20 },
@@ -141,7 +145,7 @@ export function mountApartmentPrototype(
       };
   
       let state = store.get();
-      let currentRoute = "dashboard";
+      let currentRoute = initialRoute;
       let authTab = "login";
       let complaintFilter = "current";
       let complaintSearch = "";
@@ -190,6 +194,7 @@ export function mountApartmentPrototype(
         currentRoute = route;
         window.scrollTo({ top: 0, behavior: "smooth" });
         render();
+        onNavigate(route);
       }
   
       function statusBadge(status) {
@@ -347,8 +352,7 @@ export function mountApartmentPrototype(
           if (!user.approved) return toast("관리자 승인 대기 중인 계정입니다.");
           state.currentUserId = user.id;
           store.set(state);
-          currentRoute = "dashboard";
-          render();
+          navigate("dashboard");
           toast(`${user.name}님, 환영합니다.`);
         });
         document.getElementById("resetDataBtn").addEventListener("click", () => {
@@ -488,7 +492,7 @@ export function mountApartmentPrototype(
         if (logout) logout.addEventListener("click", () => {
           state.currentUserId = null;
           store.set(state);
-          render();
+          navigate("login");
         });
         const mobileProfileBtn = document.getElementById("mobileProfileBtn");
         if (mobileProfileBtn) mobileProfileBtn.addEventListener("click", () => navigate(currentUser().role === "admin" ? "admin" : "mypage"));
@@ -966,9 +970,8 @@ export function mountApartmentPrototype(
           });
           store.set(state);
           closeModal();
-          currentRoute = "complaints";
           complaintFilter = "current";
-          render();
+          navigate("complaints");
           toast("민원이 등록되었습니다.");
         });
       }
@@ -1159,6 +1162,15 @@ export function mountApartmentPrototype(
       }
   
       render();
+
+      const mountedUser = currentUser();
+      if (!mountedUser && initialRoute !== "login") {
+        onNavigate("login", { replace: true });
+      } else if (mountedUser && initialRoute === "login") {
+        onNavigate("dashboard", { replace: true });
+      } else if (mountedUser?.role !== "admin" && initialRoute === "admin") {
+        onNavigate("dashboard", { replace: true });
+      }
 
   return () => {
     appRoot.replaceChildren()
