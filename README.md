@@ -61,6 +61,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 
 관리자 비밀번호를 잊은 경우 `/admin/login`에서 재설정 메일을 요청합니다. 이메일 링크는 `/admin/reset-password`로 돌아오며, 활성 관리자 계정으로 확인된 경우에만 새 비밀번호를 저장합니다. Supabase Authentication의 Redirect URLs에는 Production의 `https://blnapt.vercel.app/admin/reset-password`도 등록해야 합니다.
 
+관리자 이메일은 로그인 후 마이페이지의 `관리자 정보 수정`에서 변경합니다. Supabase Auth의 이메일 확인이 완료되면 `admin_accounts.email`도 자동으로 동기화되며, 이후부터 새 이메일을 로그인과 비밀번호 재설정에 사용합니다.
+
 ## Supabase 적용
 
 기존 프로젝트에서는 SQL Editor의 `postgres` 역할로 다음 파일을 순서대로 적용합니다. 이미 실행한 파일은 다시 실행하지 않습니다.
@@ -70,8 +72,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 3. `202607160003_allow_postgres_profile_admin.sql`
 4. `202607200001_households_and_residency.sql`
 5. `202607200002_separate_admin_accounts.sql`
+6. `202607200003_sync_admin_auth_email.sql`
 
-이미 4번까지 실행한 프로젝트에서는 5번 파일만 새로 실행합니다. 실행 후 검증 SQL:
+각 마이그레이션은 번호 순서대로 한 번만 실행합니다. 실행 후 검증 SQL:
 
 ```sql
 select building, count(*) as household_count

@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, signIn, signInAdmin, signOut, signUp, updateAdminPassword, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -1263,15 +1263,21 @@ export function mountApartmentPrototype(
   
       function openProfileForm() {
         const user = currentUser();
+        const isAdminUser = user.role === "admin";
         modal(`
-          <div class="modal-head"><h3>회원정보 수정</h3><button class="close-btn" data-close-modal>✕</button></div>
+          <div class="modal-head"><h3>${isAdminUser ? '관리자 정보 수정' : '회원정보 수정'}</h3><button class="close-btn" data-close-modal>✕</button></div>
           <form id="profileForm">
             <div class="modal-body">
-              <div class="field-row">
-                <div class="field"><label>동</label><input class="control" value="${escapeHtml(user.building)}" disabled /></div>
-                <div class="field"><label>호수</label><input class="control" value="${escapeHtml(user.unit)}" disabled /></div>
-              </div>
-              <div class="field"><label>전화번호 뒤 4자리</label><input class="control" value="${escapeHtml(user.phone)}" disabled /></div>
+              ${isAdminUser ? `
+                <div class="field"><label>관리자 이메일</label><input class="control" type="email" id="profileAdminEmail" autocomplete="email" value="${escapeHtml(user.email)}" required /></div>
+                <div class="demo-box">이메일 변경 시 확인 메일이 발송됩니다. 확인이 완료된 이메일이 다음 로그인부터 적용됩니다.</div>
+              ` : `
+                <div class="field-row">
+                  <div class="field"><label>동</label><input class="control" value="${escapeHtml(user.building)}" disabled /></div>
+                  <div class="field"><label>호수</label><input class="control" value="${escapeHtml(user.unit)}" disabled /></div>
+                </div>
+                <div class="field"><label>전화번호 뒤 4자리</label><input class="control" value="${escapeHtml(user.phone)}" disabled /></div>
+              `}
               <div class="field"><label>새 비밀번호</label><input class="control" type="password" id="profilePassword" placeholder="변경하지 않으려면 비워두세요." /></div>
             </div>
             <div class="modal-foot"><button class="btn btn-secondary" type="button" data-close-modal>취소</button><button class="btn btn-primary" type="submit">저장</button></div>
@@ -1280,12 +1286,15 @@ export function mountApartmentPrototype(
         document.getElementById("profileForm").addEventListener("submit", async e => {
           e.preventDefault();
           try {
+            const emailChangeRequested = isAdminUser
+              ? await updateAdminEmail(document.getElementById("profileAdminEmail").value)
+              : false;
             await updateProfile({
               password: document.getElementById("profilePassword").value || undefined,
             });
             await refreshState();
             closeModal();
-            toast("회원정보가 수정되었습니다.");
+            toast(emailChangeRequested ? "새 관리자 이메일로 확인 메일을 보냈습니다." : "회원정보가 수정되었습니다.");
           } catch (error) {
             handleError(error, "회원정보를 수정하지 못했습니다.");
           }

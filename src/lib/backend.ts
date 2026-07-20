@@ -115,6 +115,26 @@ export async function updateAdminPassword(password: string) {
   await client().auth.signOut()
 }
 
+export async function updateAdminEmail(email: string) {
+  const user = await getSessionUser()
+  if (!user) throw new Error('관리자 로그인이 필요합니다.')
+
+  const { data: admin, error: adminError } = await client()
+    .from('admin_accounts')
+    .select('id, email, active')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (adminError) throw adminError
+  if (!admin?.active) throw new Error('활성 관리자 계정만 이메일을 변경할 수 있습니다.')
+
+  const normalizedEmail = email.trim().toLowerCase()
+  if (normalizedEmail === admin.email.toLowerCase()) return false
+
+  const { error } = await client().auth.updateUser({ email: normalizedEmail })
+  if (error) throw error
+  return true
+}
+
 export async function signUp(input: ResidentRegistration) {
   await invokeResidentFunction<{ ok: true }>('resident-register', input)
 }
@@ -178,6 +198,7 @@ export async function fetchAppState() {
 
   const users = (profilesResult.data ?? []).filter((row) => row.role !== 'admin').map((row) => ({
     id: row.id, role: row.role, name: row.name,
+    email: '',
     phone: isAdminAccount || row.id === user.id ? row.phone ?? '' : '',
     phoneLast4: row.phone_last4 ?? row.phone?.slice(-4) ?? '', building: row.building,
     unit: row.unit, approved: row.approved, householdId: row.household_id, membershipStatus: row.membership_status,
@@ -187,6 +208,7 @@ export async function fetchAppState() {
       id: user.id,
       role: 'admin',
       name: adminAccount.name,
+      email: adminAccount.email,
       phone: adminAccount.phone ?? '',
       phoneLast4: '',
       building: '관리',
