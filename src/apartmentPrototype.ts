@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, signIn, signInAdmin, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, signIn, signInAdmin, signOut, signUp, updateAdminPassword, updateComplaintStatus, updateProfile } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -105,6 +105,10 @@ export function mountApartmentPrototype(
         }
         if (loadError) {
           app.innerHTML = `<section class="auth-wrap"><div class="auth-panel" style="grid-column:1/-1"><div class="auth-card"><h2>백엔드 연결 설정 필요</h2><p class="lead">${escapeHtml(loadError)}</p><div class="demo-box"><code>VITE_SUPABASE_URL</code><br/><code>VITE_SUPABASE_PUBLISHABLE_KEY</code><p style="margin-top:10px">로컬은 <b>.env.local</b>, Vercel은 프로젝트 환경변수에 등록하세요.</p></div></div></div></section>`;
+          return;
+        }
+        if (currentRoute === "adminResetPassword") {
+          renderAdminPasswordReset();
           return;
         }
         const user = currentUser();
@@ -227,8 +231,48 @@ export function mountApartmentPrototype(
             </div>
             <button class="btn btn-primary btn-block" type="submit">관리자 로그인</button>
           </form>
+          <button class="btn btn-secondary btn-block" type="button" id="requestAdminPasswordReset" style="margin-top:12px;">비밀번호 재설정</button>
           <button class="btn btn-secondary btn-block" type="button" id="goResidentLogin" style="margin-top:12px;">입주민 로그인으로 돌아가기</button>
         `;
+      }
+
+      function renderAdminPasswordReset() {
+        app.innerHTML = `
+          <section class="auth-wrap">
+            <div class="auth-visual">
+              <div class="brand-lockup">
+                <div class="brand-mark">APT</div>
+                <div>
+                  <div class="brand-title">보라매롯데낙천대 관리사무소</div>
+                  <div class="brand-sub">관리자 계정 보안</div>
+                </div>
+              </div>
+              <div class="hero-copy">
+                <h1>관리자 비밀번호를<br/>안전하게 변경합니다.</h1>
+                <p>관리자 이메일로 받은 재설정 링크를 통해서만 새 비밀번호를 등록할 수 있습니다.</p>
+              </div>
+            </div>
+            <div class="auth-panel">
+              <div class="auth-card">
+                <h2>새 비밀번호 설정</h2>
+                <p class="lead">8자 이상의 새 비밀번호를 입력하세요.</p>
+                <form id="adminResetPasswordForm">
+                  <div class="field">
+                    <label>새 비밀번호</label>
+                    <input class="control" type="password" id="newAdminPassword" minlength="8" maxlength="72" autocomplete="new-password" required />
+                  </div>
+                  <div class="field">
+                    <label>새 비밀번호 확인</label>
+                    <input class="control" type="password" id="newAdminPasswordConfirm" minlength="8" maxlength="72" autocomplete="new-password" required />
+                  </div>
+                  <button class="btn btn-primary btn-block" type="submit">비밀번호 변경</button>
+                </form>
+                <button class="btn btn-secondary btn-block" type="button" id="cancelAdminPasswordReset" style="margin-top:12px;">관리자 로그인으로 돌아가기</button>
+              </div>
+            </div>
+          </section>
+        `;
+        bindAdminPasswordReset();
       }
   
       function renderRegisterForm() {
@@ -292,6 +336,24 @@ export function mountApartmentPrototype(
 
       function bindAdminLogin() {
         document.getElementById("goResidentLogin").addEventListener("click", () => navigate("login"));
+        document.getElementById("requestAdminPasswordReset").addEventListener("click", async () => {
+          const emailInput = document.getElementById("adminEmail");
+          const email = emailInput.value.trim();
+          if (!email || !emailInput.checkValidity()) {
+            emailInput.reportValidity();
+            return;
+          }
+          const button = document.getElementById("requestAdminPasswordReset");
+          button.disabled = true;
+          try {
+            await requestAdminPasswordReset(email, `${window.location.origin}/admin/reset-password`);
+            toast("관리자 이메일로 비밀번호 재설정 링크를 보냈습니다.");
+          } catch (error) {
+            handleError(error, "비밀번호 재설정 메일을 보내지 못했습니다.");
+          } finally {
+            button.disabled = false;
+          }
+        });
         document.getElementById("adminLoginForm").addEventListener("submit", async e => {
           e.preventDefault();
           const submitButton = e.submitter;
@@ -306,6 +368,29 @@ export function mountApartmentPrototype(
             toast(`${admin.name} 관리자님, 환영합니다.`);
           } catch (error) {
             handleError(error, "관리자 로그인 정보가 일치하지 않습니다.");
+            submitButton.disabled = false;
+          }
+        });
+      }
+
+      function bindAdminPasswordReset() {
+        document.getElementById("cancelAdminPasswordReset").addEventListener("click", async () => {
+          await signOut().catch(() => {});
+          navigate("adminLogin");
+        });
+        document.getElementById("adminResetPasswordForm").addEventListener("submit", async e => {
+          e.preventDefault();
+          const submitButton = e.submitter;
+          const password = document.getElementById("newAdminPassword").value;
+          const passwordConfirm = document.getElementById("newAdminPasswordConfirm").value;
+          if (password !== passwordConfirm) return toast("새 비밀번호가 일치하지 않습니다.");
+          submitButton.disabled = true;
+          try {
+            await updateAdminPassword(password);
+            navigate("adminLogin");
+            toast("비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.");
+          } catch (error) {
+            handleError(error, "관리자 비밀번호를 변경하지 못했습니다.");
             submitButton.disabled = false;
           }
         });
@@ -1211,7 +1296,8 @@ export function mountApartmentPrototype(
       bootstrap().then(() => {
         const mountedUser = currentUser();
         const isAuthRoute = initialRoute === "login" || initialRoute === "adminLogin";
-        if (!mountedUser && !isAuthRoute) {
+        const isPasswordResetRoute = initialRoute === "adminResetPassword";
+        if (!mountedUser && !isAuthRoute && !isPasswordResetRoute) {
           onNavigate("login", { replace: true });
         } else if (mountedUser && isAuthRoute) {
           onNavigate(mountedUser.role === "admin" ? "admin" : "dashboard", { replace: true });

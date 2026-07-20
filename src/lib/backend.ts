@@ -88,6 +88,33 @@ export async function signInAdmin(email: string, password: string) {
   return admin
 }
 
+export async function requestAdminPasswordReset(email: string, redirectTo: string) {
+  const { error } = await client().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo,
+  })
+  if (error) throw error
+}
+
+export async function updateAdminPassword(password: string) {
+  const user = await getSessionUser()
+  if (!user) throw new Error('비밀번호 재설정 링크가 만료되었거나 올바르지 않습니다.')
+
+  const { data: admin, error: adminError } = await client()
+    .from('admin_accounts')
+    .select('id, active')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (adminError) throw adminError
+  if (!admin?.active) {
+    await client().auth.signOut()
+    throw new Error('관리자 계정만 비밀번호를 재설정할 수 있습니다.')
+  }
+
+  const { error } = await client().auth.updateUser({ password })
+  if (error) throw error
+  await client().auth.signOut()
+}
+
 export async function signUp(input: ResidentRegistration) {
   await invokeResidentFunction<{ ok: true }>('resident-register', input)
 }

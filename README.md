@@ -59,6 +59,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 
 관리자 로그인은 `/admin/login`에서 완전히 분리됩니다. 관리자는 동·호수와 관계없는 이메일·비밀번호를 사용하며, 관리자 정보와 활성 여부는 `admin_accounts`가 기준입니다. 기존 FK 호환용 `profiles` 행은 남아 있지만 734세대의 현재 입주민으로 집계되지 않습니다.
 
+관리자 비밀번호를 잊은 경우 `/admin/login`에서 재설정 메일을 요청합니다. 이메일 링크는 `/admin/reset-password`로 돌아오며, 활성 관리자 계정으로 확인된 경우에만 새 비밀번호를 저장합니다. Supabase Authentication의 Redirect URLs에는 Production의 `https://blnapt.vercel.app/admin/reset-password`도 등록해야 합니다.
+
 ## Supabase 적용
 
 기존 프로젝트에서는 SQL Editor의 `postgres` 역할로 다음 파일을 순서대로 적용합니다. 이미 실행한 파일은 다시 실행하지 않습니다.

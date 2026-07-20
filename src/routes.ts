@@ -1,6 +1,7 @@
 export const routePaths = {
   login: '/login',
   adminLogin: '/admin/login',
+  adminResetPassword: '/admin/reset-password',
   dashboard: '/dashboard',
   complaints: '/complaints',
   notices: '/notices',
