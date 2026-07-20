@@ -74,6 +74,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 5. `202607200002_separate_admin_accounts.sql`
 6. `202607200003_sync_admin_auth_email.sql`
 7. `202607200004_resident_cards.sql`
+8. `202607200005_admin_resident_status.sql`
 
 각 마이그레이션은 번호 순서대로 한 번만 실행합니다. 실행 후 검증 SQL:
 

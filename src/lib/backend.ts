@@ -316,6 +316,12 @@ export async function rejectRegistration(requestId: number) {
   if (error) throw error
 }
 
+export async function deactivateResident(residentId: string) {
+  const { data, error } = await client().rpc('deactivate_resident', { target_resident_id: residentId })
+  if (error) throw error
+  return data as number
+}
+
 export async function createComplaint(input: { authorId: string; title: string; category: string; location: string; content: string; status: string; file?: File }) {
   let imagePath: string | null = null
   if (input.file) {

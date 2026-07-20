@@ -26,7 +26,7 @@ function App() {
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/residents" element={<AdminResidentsPage />} />
-        <Route path="/admin/residents/:residentId" element={<AdminResidentDetailPage />} />
+        <Route path="/admin/residents/:householdId" element={<AdminResidentDetailPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <div id="toast" className="toast" role="status" aria-live="polite" />

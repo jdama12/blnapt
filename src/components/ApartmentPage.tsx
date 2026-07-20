@@ -5,18 +5,18 @@ import { routePaths, type AppRoute } from '../routes'
 
 type ApartmentPageProps = {
   route: AppRoute
-  residentId?: string
+  householdId?: string
 }
 
-export default function ApartmentPage({ route, residentId }: ApartmentPageProps) {
+export default function ApartmentPage({ route, householdId }: ApartmentPageProps) {
   const appRef = useRef<HTMLDivElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
   const handleNavigate = useCallback(
-    (nextRoute: AppRoute, options?: { replace?: boolean; residentId?: string }) => {
-      const path = nextRoute === 'adminResidentDetail' && options?.residentId
-        ? `${routePaths.adminResidentDetail}/${options.residentId}`
+    (nextRoute: AppRoute, options?: { replace?: boolean; householdId?: string }) => {
+      const path = nextRoute === 'adminResidentDetail' && options?.householdId
+        ? `${routePaths.adminResidentDetail}/${options.householdId}`
         : routePaths[nextRoute]
       navigate(path, { replace: options?.replace })
     },
@@ -30,10 +30,10 @@ export default function ApartmentPage({ route, residentId }: ApartmentPageProps)
       appRef.current,
       modalRef.current,
       route,
-      residentId,
+      householdId,
       handleNavigate,
     )
-  }, [handleNavigate, residentId, route])
+  }, [handleNavigate, householdId, route])
 
   return (
     <>

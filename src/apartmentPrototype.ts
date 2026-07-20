@@ -4,15 +4,15 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile, updateResidentCardField } from './lib/backend'
+import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deactivateResident, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile, updateResidentCardField } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
   appRoot: HTMLElement,
   modalRootElement: HTMLElement,
   initialRoute: AppRoute,
-  residentId: string | undefined,
-  onNavigate: (route: AppRoute, options?: { replace?: boolean; residentId?: string }) => void,
+  householdId: string | undefined,
+  onNavigate: (route: AppRoute, options?: { replace?: boolean; householdId?: string }) => void,
 ) {
       const STATUS = {
         pending: { label: "접수대기", className: "status-pending", progress: 20 },
@@ -954,7 +954,7 @@ export function mountApartmentPrototype(
             </form>
           </div>
           <section class="card">
-            <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>${unitQuery ? `${escapeHtml(unitQuery)}호 검색 결과` : "등록된 입주민을 선택하면 상세 카드로 이동합니다."}</p></div><strong>${visibleHouseholds.length}세대</strong></div>
+            <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>${unitQuery ? `${escapeHtml(unitQuery)}호 검색 결과` : "세대를 선택하면 가입상태와 상세 정보로 이동합니다."}</p></div><strong>${visibleHouseholds.length}세대</strong></div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>동</th><th>호수</th><th>전화번호 뒷자리</th><th>전입일</th><th>가입상태</th></tr></thead>
@@ -968,7 +968,7 @@ export function mountApartmentPrototype(
                       : waiting
                         ? '<span class="status-pill status-pending">승인대기</span>'
                         : '<span class="status-pill">미가입</span>';
-                    return `<tr class="${resident ? "resident-row" : ""}" ${resident ? `data-resident-id="${resident.id}" tabindex="0"` : ""}>
+                    return `<tr class="resident-row" data-household-id="${household.id}" tabindex="0">
                       <td>${escapeHtml(household.building)}동</td>
                       <td><strong>${escapeHtml(household.unit)}호</strong></td>
                       <td>${resident ? escapeHtml(resident.phoneLast4 || resident.phone?.slice(-4) || "-") : waiting ? escapeHtml(waiting.phoneLast4) : "-"}</td>
@@ -984,63 +984,66 @@ export function mountApartmentPrototype(
       }
 
       function renderAdminResidentDetail() {
-        const resident = state.users.find(user => user.id === residentId && user.role === "resident");
-        const household = resident ? state.households.find(item => item.id === resident.householdId && item.currentResidentId === resident.id) : null;
-        if (!resident || !household) {
+        const household = state.households.find(item => String(item.id) === String(householdId));
+        if (!household) {
           return `
-            <div class="page-head"><div><h2>입주민 상세</h2><p>현재 등록된 입주민을 찾을 수 없습니다.</p></div></div>
-            <section class="card"><div class="card-body">${renderEmpty("입주민이 변경되었거나 잘못된 경로입니다.")}<button class="btn btn-secondary" data-route="adminResidents">목록으로 돌아가기</button></div></section>
+            <div class="page-head"><div><h2>입주민 상세</h2><p>세대 정보를 찾을 수 없습니다.</p></div></div>
+            <section class="card"><div class="card-body">${renderEmpty("잘못된 세대 경로입니다.")}<button class="btn btn-secondary" data-route="adminResidents">목록으로 돌아가기</button></div></section>
           `;
         }
-        const card = state.residentCards.find(item => item.residentId === resident.id);
+        const resident = household.currentResidentId ? state.users.find(user => user.id === household.currentResidentId) : null;
+        const pendingRequest = state.registrationRequests.find(request => request.householdId === household.id);
+        const card = resident ? state.residentCards.find(item => item.residentId === resident.id) : null;
+        const phone = resident?.phone || pendingRequest?.phone || "";
+        const statusKey = resident ? "active" : pendingRequest ? "pending" : "unregistered";
+        const statusLabel = resident ? "가입완료" : pendingRequest ? "승인대기" : "미가입";
+        const statusClass = resident ? "status-complete" : pendingRequest ? "status-pending" : "";
         return `
           <div class="resident-breadcrumb"><button class="link-button" data-route="adminResidents">입주민 현황</button><span>/</span><span>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</span><span>/</span><strong>상세</strong></div>
           <div class="page-head"><div><h2>입주민 카드</h2><p>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호의 관리 정보를 확인하고 수정합니다.</p></div><button class="btn btn-secondary" data-route="adminResidents">목록으로</button></div>
           <div class="detail-layout">
             <section class="card">
-              <div class="section-title"><div><h3>기본 정보</h3><p>승인된 회원과 세대 마스터에서 가져온 정보입니다.</p></div><span class="status-pill status-complete">가입완료</span></div>
+              <div class="section-title"><div><h3>기본 정보</h3><p>세대 마스터와 회원 가입 정보입니다.</p></div><span class="status-pill ${statusClass}">${statusLabel}</span></div>
               <div class="card-body">
                 <div class="detail-grid">
                   <div><div class="detail-label">동</div><div class="detail-value">${escapeHtml(household.building)}동</div></div>
                   <div><div class="detail-label">호수</div><div class="detail-value">${escapeHtml(household.unit)}호</div></div>
-                  <div><div class="detail-label">전화번호 뒷자리</div><div class="detail-value">${escapeHtml(resident.phoneLast4 || resident.phone?.slice(-4) || "-")}</div></div>
+                  <div><div class="detail-label">전화번호</div><div class="detail-value">${phone ? escapeHtml(formatPhone(phone)) : "미등록"}</div></div>
                   <div><div class="detail-label">공급면적</div><div class="detail-value">${household.area.toFixed(2)}㎡</div></div>
                 </div>
               </div>
             </section>
             <aside class="card resident-card-summary">
-              <div class="card-body"><div class="resident-avatar">${escapeHtml(household.building)}</div><strong>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</strong><span class="muted">${escapeHtml(resident.name)}</span><span class="muted">최근 수정 ${card?.updatedAt ? escapeHtml(card.updatedAt) : "없음"}</span></div>
+              <div class="card-body"><div class="resident-avatar">${escapeHtml(household.building)}</div><strong>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</strong><span class="muted">${resident ? escapeHtml(resident.name) : pendingRequest ? "가입 승인 대기" : "등록된 입주민 없음"}</span><span class="muted">최근 수정 ${card?.updatedAt ? escapeHtml(card.updatedAt) : "없음"}</span></div>
             </aside>
           </div>
           <section class="card" style="margin-top:18px;">
-            <div class="section-title"><div><h3>관리 정보</h3><p>관리사무소에서 필요한 정보만 기록하세요.</p></div></div>
-            <form id="residentCardForm">
+            <div class="section-title"><div><h3>가입상태 변경</h3><p>인증 계정과 가입 요청에 맞는 상태만 선택할 수 있습니다.</p></div></div>
+            <form id="residentMembershipForm" data-current-status="${statusKey}" ${resident ? `data-active-resident="${resident.id}"` : ""} ${pendingRequest ? `data-pending-request="${pendingRequest.id}"` : ""}>
               <div class="card-body">
+                <div class="field"><label>가입상태</label><select class="control" id="residentMembershipStatus" ${statusKey === "unregistered" ? "disabled" : ""}>
+                  ${resident ? '<option value="active" selected>가입완료</option><option value="unregistered">미가입(이용 종료)</option>' : pendingRequest ? '<option value="pending" selected>승인대기</option><option value="active">가입완료(승인)</option><option value="unregistered">미가입(거절)</option>' : '<option value="unregistered" selected>미가입</option>'}
+                </select></div>
+                ${resident && pendingRequest ? `<div class="demo-box"><strong>입주민 변경 요청이 있습니다.</strong><div class="pending-actions" style="margin-top:10px;"><button class="btn btn-secondary btn-sm" type="button" data-reject-registration="${pendingRequest.id}">변경 거절</button><button class="btn btn-primary btn-sm" type="button" data-approve-registration="${pendingRequest.id}">새 입주민으로 교체</button></div></div>` : ''}
+                ${statusKey === "unregistered" ? '<div class="demo-box">가입 요청과 인증 계정이 없는 세대입니다. 입주민이 먼저 회원가입을 요청해야 가입완료로 변경할 수 있습니다.</div>' : ''}
+              </div>
+              ${statusKey !== "unregistered" ? '<div class="modal-foot"><button class="btn btn-primary" type="submit">가입상태 저장</button></div>' : ''}
+            </form>
+          </section>
+          ${resident ? `
+            <section class="card" style="margin-top:18px;">
+              <div class="section-title"><div><h3>관리 정보</h3><p>관리사무소에서 필요한 정보만 기록하세요.</p></div></div>
+              <form id="residentCardForm"><div class="card-body">
                 <div class="field"><label>전입일</label><input class="control" type="date" id="residentMoveInDate" value="${escapeHtml(card?.moveInDate || "")}" /></div>
                 <div class="field"><label>관리자 메모</label><textarea class="control" id="residentMemo" maxlength="2000" placeholder="관리상 필요한 메모를 입력하세요.">${escapeHtml(card?.memo || "")}</textarea></div>
-                <div class="resident-custom-fields">
-                  ${(card?.fields ?? []).map(field => `
-                    <div class="resident-custom-field" data-card-field="${field.id}">
-                      <input class="control" data-field-label value="${escapeHtml(field.label)}" maxlength="50" aria-label="정보 이름" required />
-                      <input class="control" data-field-value value="${escapeHtml(field.value)}" maxlength="500" aria-label="정보 내용" />
-                      <button class="btn btn-secondary btn-sm" type="button" data-delete-card-field="${field.id}">삭제</button>
-                    </div>
-                  `).join("")}
-                </div>
-              </div>
-              <div class="modal-foot"><button class="btn btn-primary" type="submit">입주민 카드 저장</button></div>
-            </form>
-          </section>
-          <section class="card" style="margin-top:18px;">
-            <div class="section-title"><div><h3>정보 추가</h3><p>예: 차량번호, 비상연락처, 특이사항</p></div></div>
-            <form id="residentCardFieldForm">
-              <div class="card-body resident-custom-field">
-                <input class="control" id="newCardFieldLabel" maxlength="50" placeholder="정보 이름" required />
-                <input class="control" id="newCardFieldValue" maxlength="500" placeholder="내용" />
-                <button class="btn btn-primary btn-sm" type="submit">추가</button>
-              </div>
-            </form>
-          </section>
+                <div class="resident-custom-fields">${(card?.fields ?? []).map(field => `<div class="resident-custom-field" data-card-field="${field.id}"><input class="control" data-field-label value="${escapeHtml(field.label)}" maxlength="50" aria-label="정보 이름" required /><input class="control" data-field-value value="${escapeHtml(field.value)}" maxlength="500" aria-label="정보 내용" /><button class="btn btn-secondary btn-sm" type="button" data-delete-card-field="${field.id}">삭제</button></div>`).join("")}</div>
+              </div><div class="modal-foot"><button class="btn btn-primary" type="submit">입주민 카드 저장</button></div></form>
+            </section>
+            <section class="card" style="margin-top:18px;">
+              <div class="section-title"><div><h3>정보 추가</h3><p>예: 차량번호, 비상연락처, 특이사항</p></div></div>
+              <form id="residentCardFieldForm"><div class="card-body resident-custom-field"><input class="control" id="newCardFieldLabel" maxlength="50" placeholder="정보 이름" required /><input class="control" id="newCardFieldValue" maxlength="500" placeholder="내용" /><button class="btn btn-primary btn-sm" type="submit">추가</button></div></form>
+            </section>
+          ` : ''}
         `;
       }
   
@@ -1075,8 +1078,8 @@ export function mountApartmentPrototype(
           residentUnitSearch = "";
           render();
         });
-        document.querySelectorAll("[data-resident-id]").forEach(row => {
-          const openResident = () => navigate("adminResidentDetail", { residentId: row.dataset.residentId });
+        document.querySelectorAll("[data-household-id]").forEach(row => {
+          const openResident = () => navigate("adminResidentDetail", { householdId: row.dataset.householdId });
           row.addEventListener("click", openResident);
           row.addEventListener("keydown", event => {
             if (event.key === "Enter" || event.key === " ") {
@@ -1085,13 +1088,41 @@ export function mountApartmentPrototype(
             }
           });
         });
+        const residentMembershipForm = document.getElementById("residentMembershipForm");
+        if (residentMembershipForm) residentMembershipForm.addEventListener("submit", async event => {
+          event.preventDefault();
+          const currentStatus = residentMembershipForm.dataset.currentStatus;
+          const nextStatus = document.getElementById("residentMembershipStatus").value;
+          if (currentStatus === nextStatus) return toast("현재 가입상태와 동일합니다.");
+          if (!window.confirm("이 세대의 가입상태를 변경할까요?")) return;
+          const submitButton = event.submitter;
+          submitButton.disabled = true;
+          try {
+            if (currentStatus === "pending" && nextStatus === "active") {
+              await approveUser(Number(residentMembershipForm.dataset.pendingRequest));
+            } else if (currentStatus === "pending" && nextStatus === "unregistered") {
+              await rejectRegistration(Number(residentMembershipForm.dataset.pendingRequest));
+            } else if (currentStatus === "active" && nextStatus === "unregistered") {
+              await deactivateResident(residentMembershipForm.dataset.activeResident);
+            } else {
+              throw new Error("처리할 수 없는 가입상태 변경입니다.");
+            }
+            await refreshState();
+            toast("가입상태를 변경했습니다.");
+          } catch (error) {
+            handleError(error, "가입상태를 변경하지 못했습니다.");
+            submitButton.disabled = false;
+          }
+        });
+        const detailHousehold = state.households.find(item => String(item.id) === String(householdId));
+        const detailResidentId = detailHousehold?.currentResidentId;
         const residentCardForm = document.getElementById("residentCardForm");
         if (residentCardForm) residentCardForm.addEventListener("submit", async event => {
           event.preventDefault();
           const submitButton = event.submitter;
           submitButton.disabled = true;
           try {
-            await saveResidentCard(residentId, {
+            await saveResidentCard(detailResidentId, {
               moveInDate: document.getElementById("residentMoveInDate").value || null,
               memo: document.getElementById("residentMemo").value.trim(),
             });
@@ -1114,12 +1145,12 @@ export function mountApartmentPrototype(
           const submitButton = event.submitter;
           submitButton.disabled = true;
           try {
-            await saveResidentCard(residentId, {
+            await saveResidentCard(detailResidentId, {
               moveInDate: document.getElementById("residentMoveInDate").value || null,
               memo: document.getElementById("residentMemo").value.trim(),
             });
             await addResidentCardField(
-              residentId,
+              detailResidentId,
               document.getElementById("newCardFieldLabel").value.trim(),
               document.getElementById("newCardFieldValue").value.trim(),
             );
