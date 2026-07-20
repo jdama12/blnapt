@@ -4,14 +4,15 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile, updateResidentCardField } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
   appRoot: HTMLElement,
   modalRootElement: HTMLElement,
   initialRoute: AppRoute,
-  onNavigate: (route: AppRoute, options?: { replace?: boolean }) => void,
+  residentId: string | undefined,
+  onNavigate: (route: AppRoute, options?: { replace?: boolean; residentId?: string }) => void,
 ) {
       const STATUS = {
         pending: { label: "접수대기", className: "status-pending", progress: 20 },
@@ -20,7 +21,7 @@ export function mountApartmentPrototype(
         complete: { label: "처리완료", className: "status-complete", progress: 100 }
       };
   
-      const emptyState = { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] };
+      const emptyState = { currentUserId: null, users: [], households: [], registrationRequests: [], residentCards: [], complaints: [], notices: [], fees: [], income: [] };
       let state = structuredClone(emptyState);
       let loading = true;
       let loadError = "";
@@ -86,11 +87,11 @@ export function mountApartmentPrototype(
           if (!disposed) render();
         }
       }
-      function navigate(route) {
+      function navigate(route, options) {
         currentRoute = route;
         window.scrollTo({ top: 0, behavior: "smooth" });
         render();
-        onNavigate(route);
+        onNavigate(route, options);
       }
   
       function statusBadge(status) {
@@ -430,7 +431,10 @@ export function mountApartmentPrototype(
           ["fees", "₩", "관리비·수입"],
           ["mypage", "●", "나의 페이지"]
         ];
-        if (user.role === "admin") navs.push(["admin", "⚙", "관리자"]);
+        if (user.role === "admin") {
+          navs.push(["admin", "⚙", "관리자"]);
+          navs.push(["adminResidents", "▤", "입주민 현황"]);
+        }
         return `
           <aside class="sidebar">
             <div class="brand-lockup">
@@ -442,7 +446,7 @@ export function mountApartmentPrototype(
             </div>
             <nav class="nav-group">
               ${navs.map(([route, icon, label]) => `
-                <button class="nav-item ${currentRoute === route ? "active" : ""}" data-route="${route}">
+                <button class="nav-item ${currentRoute === route || (route === "adminResidents" && currentRoute === "adminResidentDetail") ? "active" : ""}" data-route="${route}">
                   <span class="nav-icon">${icon}</span>${label}
                 </button>
               `).join("")}
@@ -507,7 +511,8 @@ export function mountApartmentPrototype(
       function routeTitle() {
         return ({
           dashboard: "대시보드", complaints: "민원", notices: "아파트 소식",
-          fees: "관리비·수입", mypage: "나의 페이지", admin: "관리자"
+          fees: "관리비·수입", mypage: "나의 페이지", admin: "관리자",
+          adminResidents: "입주민 현황", adminResidentDetail: "입주민 상세"
         })[currentRoute] || "대시보드";
       }
   
@@ -518,6 +523,8 @@ export function mountApartmentPrototype(
           case "fees": return renderFees(user);
           case "mypage": return renderMyPage(user);
           case "admin": return user.role === "admin" ? renderAdmin(user) : renderDashboard(user);
+          case "adminResidents": return user.role === "admin" ? renderAdminResidents() : renderDashboard(user);
+          case "adminResidentDetail": return user.role === "admin" ? renderAdminResidentDetail() : renderDashboard(user);
           default: return renderDashboard(user);
         }
       }
@@ -854,9 +861,6 @@ export function mountApartmentPrototype(
         const pending = state.registrationRequests;
         const complaints = state.complaints.slice().sort((a,b)=>b.id-a.id);
         const occupiedCount = state.households.filter(h => h.currentResidentId).length;
-        const visibleHouseholds = householdBuildingFilter === "all"
-          ? state.households
-          : state.households.filter(h => h.building === householdBuildingFilter);
         return `
           <div class="page-head"><div><h2>관리자</h2><p>회원 승인과 민원 업무를 관리합니다.</p></div></div>
           <div class="grid grid-4" style="margin-bottom:18px;">
@@ -905,29 +909,8 @@ export function mountApartmentPrototype(
 
           <section class="card" style="margin-top:18px;">
             <div class="section-title">
-              <div><h3>동·호수별 세대 현황</h3><p>엑셀 원본 기준 734세대의 현재 입주 상태</p></div>
-              <select class="control compact-select" id="householdBuildingFilter">
-                <option value="all" ${householdBuildingFilter === "all" ? "selected" : ""}>전체 동</option>
-                ${["101","102","103","104","105","106","107"].map(building => `<option value="${building}" ${householdBuildingFilter === building ? "selected" : ""}>${building}동</option>`).join("")}
-              </select>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>동</th><th>호수</th><th>공급면적</th><th>입주 상태</th><th>현재 입주민</th></tr></thead>
-                <tbody>
-                  ${visibleHouseholds.map(household => {
-                    const resident = household.currentResidentId ? state.users.find(user => user.id === household.currentResidentId) : null;
-                    const waiting = pending.some(request => request.householdId === household.id);
-                    return `<tr>
-                      <td>${escapeHtml(household.building)}동</td>
-                      <td><strong>${escapeHtml(household.unit)}호</strong></td>
-                      <td>${household.area.toFixed(2)}㎡</td>
-                      <td>${resident ? '<span class="status-pill status-complete">입주 등록</span>' : waiting ? '<span class="status-pill status-pending">승인 대기</span>' : '<span class="status-pill">미등록</span>'}</td>
-                      <td>${resident ? `${escapeHtml(resident.name)} · ${formatPhone(resident.phone)}` : '-'}</td>
-                    </tr>`;
-                  }).join("")}
-                </tbody>
-              </table>
+              <div><h3>입주민 현황</h3><p>734세대의 가입 상태와 입주민 카드를 별도 페이지에서 관리합니다.</p></div>
+              <button class="btn btn-primary btn-sm" data-route="adminResidents">입주민 현황 열기</button>
             </div>
           </section>
 
@@ -936,6 +919,115 @@ export function mountApartmentPrototype(
             <div class="card-body">
               <div class="complaint-list">${complaints.map(renderComplaintItem).join("")}</div>
             </div>
+          </section>
+        `;
+      }
+
+      function renderAdminResidents() {
+        const pending = state.registrationRequests;
+        const visibleHouseholds = householdBuildingFilter === "all"
+          ? state.households
+          : state.households.filter(household => household.building === householdBuildingFilter);
+        const occupiedCount = state.households.filter(household => household.currentResidentId).length;
+        return `
+          <div class="page-head">
+            <div><h2>입주민 현황</h2><p>동·호수별 가입 상태와 입주민 카드를 관리합니다.</p></div>
+            <span class="status-pill status-complete">입주 등록 ${occupiedCount} / ${state.households.length}</span>
+          </div>
+          <div class="resident-building-tabs" role="tablist" aria-label="동 선택">
+            ${["all", "101", "102", "103", "104", "105", "106", "107"].map(building => `
+              <button class="resident-building-tab ${householdBuildingFilter === building ? "active" : ""}" data-resident-building="${building}">
+                ${building === "all" ? "전체동" : `${building}동`}
+              </button>
+            `).join("")}
+          </div>
+          <section class="card">
+            <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>등록된 입주민을 선택하면 상세 카드로 이동합니다.</p></div><strong>${visibleHouseholds.length}세대</strong></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>동</th><th>호수</th><th>전화번호 뒷자리</th><th>전입일</th><th>가입상태</th></tr></thead>
+                <tbody>
+                  ${visibleHouseholds.map(household => {
+                    const resident = household.currentResidentId ? state.users.find(user => user.id === household.currentResidentId) : null;
+                    const waiting = pending.find(request => request.householdId === household.id);
+                    const card = resident ? state.residentCards.find(item => item.residentId === resident.id) : null;
+                    const status = resident
+                      ? '<span class="status-pill status-complete">가입완료</span>'
+                      : waiting
+                        ? '<span class="status-pill status-pending">승인대기</span>'
+                        : '<span class="status-pill">미가입</span>';
+                    return `<tr class="${resident ? "resident-row" : ""}" ${resident ? `data-resident-id="${resident.id}" tabindex="0"` : ""}>
+                      <td>${escapeHtml(household.building)}동</td>
+                      <td><strong>${escapeHtml(household.unit)}호</strong></td>
+                      <td>${resident ? escapeHtml(resident.phoneLast4 || resident.phone?.slice(-4) || "-") : waiting ? escapeHtml(waiting.phoneLast4) : "-"}</td>
+                      <td>${card?.moveInDate ? escapeHtml(card.moveInDate) : "미입력"}</td>
+                      <td>${status}</td>
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderAdminResidentDetail() {
+        const resident = state.users.find(user => user.id === residentId && user.role === "resident");
+        const household = resident ? state.households.find(item => item.id === resident.householdId && item.currentResidentId === resident.id) : null;
+        if (!resident || !household) {
+          return `
+            <div class="page-head"><div><h2>입주민 상세</h2><p>현재 등록된 입주민을 찾을 수 없습니다.</p></div></div>
+            <section class="card"><div class="card-body">${renderEmpty("입주민이 변경되었거나 잘못된 경로입니다.")}<button class="btn btn-secondary" data-route="adminResidents">목록으로 돌아가기</button></div></section>
+          `;
+        }
+        const card = state.residentCards.find(item => item.residentId === resident.id);
+        return `
+          <div class="resident-breadcrumb"><button class="link-button" data-route="adminResidents">입주민 현황</button><span>/</span><span>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</span><span>/</span><strong>상세</strong></div>
+          <div class="page-head"><div><h2>입주민 카드</h2><p>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호의 관리 정보를 확인하고 수정합니다.</p></div><button class="btn btn-secondary" data-route="adminResidents">목록으로</button></div>
+          <div class="detail-layout">
+            <section class="card">
+              <div class="section-title"><div><h3>기본 정보</h3><p>승인된 회원과 세대 마스터에서 가져온 정보입니다.</p></div><span class="status-pill status-complete">가입완료</span></div>
+              <div class="card-body">
+                <div class="detail-grid">
+                  <div><div class="detail-label">동</div><div class="detail-value">${escapeHtml(household.building)}동</div></div>
+                  <div><div class="detail-label">호수</div><div class="detail-value">${escapeHtml(household.unit)}호</div></div>
+                  <div><div class="detail-label">전화번호 뒷자리</div><div class="detail-value">${escapeHtml(resident.phoneLast4 || resident.phone?.slice(-4) || "-")}</div></div>
+                  <div><div class="detail-label">공급면적</div><div class="detail-value">${household.area.toFixed(2)}㎡</div></div>
+                </div>
+              </div>
+            </section>
+            <aside class="card resident-card-summary">
+              <div class="card-body"><div class="resident-avatar">${escapeHtml(household.building)}</div><strong>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</strong><span class="muted">${escapeHtml(resident.name)}</span><span class="muted">최근 수정 ${card?.updatedAt ? escapeHtml(card.updatedAt) : "없음"}</span></div>
+            </aside>
+          </div>
+          <section class="card" style="margin-top:18px;">
+            <div class="section-title"><div><h3>관리 정보</h3><p>관리사무소에서 필요한 정보만 기록하세요.</p></div></div>
+            <form id="residentCardForm">
+              <div class="card-body">
+                <div class="field"><label>전입일</label><input class="control" type="date" id="residentMoveInDate" value="${escapeHtml(card?.moveInDate || "")}" /></div>
+                <div class="field"><label>관리자 메모</label><textarea class="control" id="residentMemo" maxlength="2000" placeholder="관리상 필요한 메모를 입력하세요.">${escapeHtml(card?.memo || "")}</textarea></div>
+                <div class="resident-custom-fields">
+                  ${(card?.fields ?? []).map(field => `
+                    <div class="resident-custom-field" data-card-field="${field.id}">
+                      <input class="control" data-field-label value="${escapeHtml(field.label)}" maxlength="50" aria-label="정보 이름" required />
+                      <input class="control" data-field-value value="${escapeHtml(field.value)}" maxlength="500" aria-label="정보 내용" />
+                      <button class="btn btn-secondary btn-sm" type="button" data-delete-card-field="${field.id}">삭제</button>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+              <div class="modal-foot"><button class="btn btn-primary" type="submit">입주민 카드 저장</button></div>
+            </form>
+          </section>
+          <section class="card" style="margin-top:18px;">
+            <div class="section-title"><div><h3>정보 추가</h3><p>예: 차량번호, 비상연락처, 특이사항</p></div></div>
+            <form id="residentCardFieldForm">
+              <div class="card-body resident-custom-field">
+                <input class="control" id="newCardFieldLabel" maxlength="50" placeholder="정보 이름" required />
+                <input class="control" id="newCardFieldValue" maxlength="500" placeholder="내용" />
+                <button class="btn btn-primary btn-sm" type="submit">추가</button>
+              </div>
+            </form>
           </section>
         `;
       }
@@ -950,6 +1042,79 @@ export function mountApartmentPrototype(
       }
   
       function bindRouteEvents() {
+        document.querySelectorAll("[data-resident-building]").forEach(button => {
+          button.addEventListener("click", () => {
+            householdBuildingFilter = button.dataset.residentBuilding;
+            render();
+          });
+        });
+        document.querySelectorAll("[data-resident-id]").forEach(row => {
+          const openResident = () => navigate("adminResidentDetail", { residentId: row.dataset.residentId });
+          row.addEventListener("click", openResident);
+          row.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openResident();
+            }
+          });
+        });
+        const residentCardForm = document.getElementById("residentCardForm");
+        if (residentCardForm) residentCardForm.addEventListener("submit", async event => {
+          event.preventDefault();
+          const submitButton = event.submitter;
+          submitButton.disabled = true;
+          try {
+            await saveResidentCard(residentId, {
+              moveInDate: document.getElementById("residentMoveInDate").value || null,
+              memo: document.getElementById("residentMemo").value.trim(),
+            });
+            const fields = [...document.querySelectorAll("[data-card-field]")];
+            await Promise.all(fields.map(field => updateResidentCardField(
+              Number(field.dataset.cardField),
+              field.querySelector("[data-field-label]").value.trim(),
+              field.querySelector("[data-field-value]").value.trim(),
+            )));
+            await refreshState();
+            toast("입주민 카드를 저장했습니다.");
+          } catch (error) {
+            handleError(error, "입주민 카드를 저장하지 못했습니다.");
+            submitButton.disabled = false;
+          }
+        });
+        const residentCardFieldForm = document.getElementById("residentCardFieldForm");
+        if (residentCardFieldForm) residentCardFieldForm.addEventListener("submit", async event => {
+          event.preventDefault();
+          const submitButton = event.submitter;
+          submitButton.disabled = true;
+          try {
+            await saveResidentCard(residentId, {
+              moveInDate: document.getElementById("residentMoveInDate").value || null,
+              memo: document.getElementById("residentMemo").value.trim(),
+            });
+            await addResidentCardField(
+              residentId,
+              document.getElementById("newCardFieldLabel").value.trim(),
+              document.getElementById("newCardFieldValue").value.trim(),
+            );
+            await refreshState();
+            toast("관리 정보를 추가했습니다.");
+          } catch (error) {
+            handleError(error, "관리 정보를 추가하지 못했습니다.");
+            submitButton.disabled = false;
+          }
+        });
+        document.querySelectorAll("[data-delete-card-field]").forEach(button => {
+          button.addEventListener("click", async () => {
+            if (!window.confirm("이 관리 정보를 삭제할까요?")) return;
+            try {
+              await deleteResidentCardField(Number(button.dataset.deleteCardField));
+              await refreshState();
+              toast("관리 정보를 삭제했습니다.");
+            } catch (error) {
+              handleError(error, "관리 정보를 삭제하지 못했습니다.");
+            }
+          });
+        });
         document.querySelectorAll("[data-complaint-id]").forEach(el => {
           el.addEventListener("click", () => openComplaintDetail(Number(el.dataset.complaintId)));
         });
@@ -1306,11 +1471,12 @@ export function mountApartmentPrototype(
         const mountedUser = currentUser();
         const isAuthRoute = initialRoute === "login" || initialRoute === "adminLogin";
         const isPasswordResetRoute = initialRoute === "adminResetPassword";
+        const isAdminOnlyRoute = initialRoute === "admin" || initialRoute === "adminResidents" || initialRoute === "adminResidentDetail";
         if (!mountedUser && !isAuthRoute && !isPasswordResetRoute) {
           onNavigate("login", { replace: true });
         } else if (mountedUser && isAuthRoute) {
           onNavigate(mountedUser.role === "admin" ? "admin" : "dashboard", { replace: true });
-        } else if (mountedUser?.role !== "admin" && initialRoute === "admin") {
+        } else if (mountedUser?.role !== "admin" && isAdminOnlyRoute) {
           onNavigate("dashboard", { replace: true });
         }
       });

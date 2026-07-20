@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AdminPage from './pages/AdminPage'
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminResetPasswordPage from './pages/AdminResetPasswordPage'
+import AdminResidentDetailPage from './pages/AdminResidentDetailPage'
+import AdminResidentsPage from './pages/AdminResidentsPage'
 import ComplaintsPage from './pages/ComplaintsPage'
 import DashboardPage from './pages/DashboardPage'
 import FeesPage from './pages/FeesPage'
@@ -23,6 +25,8 @@ function App() {
         <Route path="/fees" element={<FeesPage />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/residents" element={<AdminResidentsPage />} />
+        <Route path="/admin/residents/:residentId" element={<AdminResidentDetailPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <div id="toast" className="toast" role="status" aria-live="polite" />

@@ -146,7 +146,7 @@ export async function signOut() {
 
 export async function fetchAppState() {
   const user = await getSessionUser()
-  if (!user) return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
+  if (!user) return { currentUserId: null, users: [], households: [], registrationRequests: [], residentCards: [], complaints: [], notices: [], fees: [], income: [] }
 
   const [adminResult, profileResult] = await Promise.all([
     client().from('admin_accounts').select('*').eq('id', user.id).maybeSingle(),
@@ -165,7 +165,7 @@ export async function fetchAppState() {
   )
   if (!isAdminAccount && !isActiveResident) {
     await client().auth.signOut()
-    return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
+    return { currentUserId: null, users: [], households: [], registrationRequests: [], residentCards: [], complaints: [], notices: [], fees: [], income: [] }
   }
 
   const profilesQuery = isAdminAccount
@@ -178,16 +178,20 @@ export async function fetchAppState() {
   const householdsPromise = isAdminAccount
     ? client().from('households').select('*').order('building').order('unit')
     : Promise.resolve({ data: [], error: null })
+  const residentCardsPromise = isAdminAccount
+    ? client().from('resident_cards').select('*, resident_card_fields(*)')
+    : Promise.resolve({ data: [], error: null })
 
-  const [profilesResult, householdsResult, registrationsResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
+  const [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
     profilesQuery,
     householdsPromise,
     registrationRequestsPromise,
+    residentCardsPromise,
     client().from('complaints').select('*, complaint_comments(*), complaint_history(*)').order('created_at', { ascending: false }),
     client().from('notices').select('*').order('pinned', { ascending: false }).order('published_at', { ascending: false }),
     client().from('monthly_records').select('*, monthly_items(*)').order('month', { ascending: false }),
   ])
-  for (const result of [profilesResult, householdsResult, registrationsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
+  for (const result of [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
 
   const paths = (complaintsResult.data ?? []).map((row) => row.image_path).filter(Boolean)
   const signedUrls = new Map<string, string>()
@@ -240,6 +244,20 @@ export async function fetchAppState() {
     area: Number(row.area_sqm),
     currentResidentId: row.current_resident_id,
   }))
+  const residentCards = (residentCardsResult.data ?? []).map((row) => ({
+    residentId: row.resident_id,
+    moveInDate: row.move_in_date ?? '',
+    memo: row.memo ?? '',
+    updatedAt: formatDateTime(row.updated_at),
+    fields: (row.resident_card_fields ?? [])
+      .sort((a: { sort_order: number; id: number }, b: { sort_order: number; id: number }) => a.sort_order - b.sort_order || a.id - b.id)
+      .map((field: { id: number; label: string; value: string; sort_order: number }) => ({
+        id: field.id,
+        label: field.label,
+        value: field.value,
+        sortOrder: field.sort_order,
+      })),
+  }))
   const complaints = (complaintsResult.data ?? []).map((row) => {
     const comments = (row.complaint_comments ?? []) as CommentRow[]
     const history = (row.complaint_history ?? []) as HistoryRow[]
@@ -256,7 +274,35 @@ export async function fetchAppState() {
     const items = (row.monthly_items ?? []) as MonthlyItemRow[]
     return { kind: row.kind, month: row.month.slice(0, 7), total: Number(row.total), previous: Number(row.previous), items: items.sort((a, b) => a.sort_order - b.sort_order).map((item) => [item.name, Number(item.current_amount), Number(item.previous_amount)]) }
   })
-  return { currentUserId: user.id, users, households, registrationRequests, complaints, notices, fees: mappedRecords.filter((row) => row.kind === 'fee'), income: mappedRecords.filter((row) => row.kind === 'income') }
+  return { currentUserId: user.id, users, households, registrationRequests, residentCards, complaints, notices, fees: mappedRecords.filter((row) => row.kind === 'fee'), income: mappedRecords.filter((row) => row.kind === 'income') }
+}
+
+export async function saveResidentCard(residentId: string, input: { moveInDate: string | null; memo: string }) {
+  const { error } = await client().from('resident_cards').upsert({
+    resident_id: residentId,
+    move_in_date: input.moveInDate,
+    memo: input.memo,
+  }, { onConflict: 'resident_id' })
+  if (error) throw error
+}
+
+export async function addResidentCardField(residentId: string, label: string, value: string) {
+  const { error } = await client().from('resident_card_fields').insert({
+    resident_id: residentId,
+    label,
+    value,
+  })
+  if (error) throw error
+}
+
+export async function updateResidentCardField(id: number, label: string, value: string) {
+  const { error } = await client().from('resident_card_fields').update({ label, value }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteResidentCardField(id: number) {
+  const { error } = await client().from('resident_card_fields').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function approveUser(requestId: number) {
