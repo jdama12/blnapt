@@ -6,7 +6,6 @@ import FeesPage from './pages/FeesPage'
 import LoginPage from './pages/LoginPage'
 import MyPage from './pages/MyPage'
 import NoticesPage from './pages/NoticesPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function App() {
   return (
@@ -14,7 +13,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/complaints" element={<ComplaintsPage />} />
         <Route path="/notices" element={<NoticesPage />} />

@@ -452,6 +452,10 @@
     .pending-user:last-child { border-bottom: 0; }
     .pending-user strong { display: block; }
     .pending-user span { color: var(--muted); font-size: 12px; }
+    .pending-user.replacement-request { margin: 0 -12px; padding: 14px 12px; border-radius: 12px; background: #fff7ed; }
+    .pending-user .status-high { display: inline-flex; margin-left: 6px; color: #9a3412; background: #ffedd5; }
+    .pending-actions { display: flex; gap: 7px; flex-shrink: 0; }
+    .compact-select { width: auto; min-width: 112px; }
 
     .empty-state {
       text-align: center; padding: 44px 20px; color: var(--muted);

@@ -17,47 +17,58 @@ export async function getSessionUser() {
   return data.session?.user ?? null
 }
 
-export async function signIn(email: string, password: string) {
-  const { data, error } = await client().auth.signInWithPassword({ email, password })
+type ResidentCredentials = {
+  building: string
+  unit: string
+  phoneLast4: string
+  password: string
+}
+
+type ResidentRegistration = {
+  building: string
+  unit: string
+  phone: string
+  password: string
+}
+
+async function invokeResidentFunction<T>(name: string, body: ResidentCredentials | ResidentRegistration) {
+  const { data, error } = await client().functions.invoke(name, { body })
+  if (error) {
+    let message = error.message
+    const context = (error as { context?: Response }).context
+    if (context) {
+      try {
+        const errorBody = await context.json() as { message?: string }
+        if (errorBody.message) message = errorBody.message
+      } catch {
+        // Keep the SDK error when the function did not return JSON.
+      }
+    }
+    throw new Error(message)
+  }
+  return data as T
+}
+
+export async function signIn(input: ResidentCredentials) {
+  const session = await invokeResidentFunction<{ accessToken: string; refreshToken: string }>('resident-login', input)
+  const { data, error } = await client().auth.setSession({
+    access_token: session.accessToken,
+    refresh_token: session.refreshToken,
+  })
   if (error) throw error
+  if (!data.user) throw new Error('로그인 세션을 만들지 못했습니다.')
+
   const { data: profile, error: profileError } = await client().from('profiles').select('*').eq('id', data.user.id).single()
   if (profileError) throw profileError
-  if (!profile.approved) {
+  if (!profile.approved || profile.membership_status !== 'active') {
     await client().auth.signOut()
-    throw new Error('관리자 승인 대기 중인 계정입니다.')
+    throw new Error('현재 입주민으로 승인된 계정이 아닙니다.')
   }
   return profile
 }
 
-export async function requestPasswordReset(email: string) {
-  const { error } = await client().auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
-  })
-  if (error) throw error
-}
-
-export async function resetPassword(password: string) {
-  const { data: sessionData, error: sessionError } = await client().auth.getSession()
-  if (sessionError) throw sessionError
-  if (!sessionData.session) throw new Error('비밀번호 재설정 링크가 만료되었거나 유효하지 않습니다.')
-
-  const { error } = await client().auth.updateUser({ password })
-  if (error) throw error
-
-  await client().auth.signOut()
-}
-
-export async function signUp(input: { email: string; password: string; name: string; phone: string; building: string; unit: string }) {
-  const { data, error } = await client().auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: {
-      emailRedirectTo: `${window.location.origin}/login`,
-      data: { name: input.name, phone: input.phone, building: input.building, unit: input.unit },
-    },
-  })
-  if (error) throw error
-  if (data.session) await client().auth.signOut()
+export async function signUp(input: ResidentRegistration) {
+  await invokeResidentFunction<{ ok: true }>('resident-register', input)
 }
 
 export async function signOut() {
@@ -67,25 +78,34 @@ export async function signOut() {
 
 export async function fetchAppState() {
   const user = await getSessionUser()
-  if (!user) return { currentUserId: null, users: [], complaints: [], notices: [], fees: [], income: [] }
+  if (!user) return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
 
   const { data: ownProfile, error: ownProfileError } = await client().from('profiles').select('*').eq('id', user.id).single()
   if (ownProfileError) throw ownProfileError
-  if (!ownProfile.approved) {
+  if (!ownProfile.approved || ownProfile.membership_status !== 'active') {
     await client().auth.signOut()
-    return { currentUserId: null, users: [], complaints: [], notices: [], fees: [], income: [] }
+    return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
   }
   const profilesQuery = ownProfile.role === 'admin'
     ? client().from('profiles').select('*').order('created_at')
     : client().from('profile_directory').select('*').order('created_at')
 
-  const [profilesResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
+  const registrationRequestsPromise = ownProfile.role === 'admin'
+    ? client().from('registration_requests').select('*').eq('status', 'pending').order('created_at')
+    : Promise.resolve({ data: [], error: null })
+  const householdsPromise = ownProfile.role === 'admin'
+    ? client().from('households').select('*').order('building').order('unit')
+    : Promise.resolve({ data: [], error: null })
+
+  const [profilesResult, householdsResult, registrationsResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
     profilesQuery,
+    householdsPromise,
+    registrationRequestsPromise,
     client().from('complaints').select('*, complaint_comments(*), complaint_history(*)').order('created_at', { ascending: false }),
     client().from('notices').select('*').order('pinned', { ascending: false }).order('published_at', { ascending: false }),
     client().from('monthly_records').select('*, monthly_items(*)').order('month', { ascending: false }),
   ])
-  for (const result of [profilesResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
+  for (const result of [profilesResult, householdsResult, registrationsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
 
   const paths = (complaintsResult.data ?? []).map((row) => row.image_path).filter(Boolean)
   const signedUrls = new Map<string, string>()
@@ -95,8 +115,32 @@ export async function fetchAppState() {
   }))
 
   const users = (profilesResult.data ?? []).map((row) => ({
-    id: row.id, role: row.role, name: row.name, phone: row.id === user.id ? ownProfile.phone : row.phone ?? '', building: row.building,
-    unit: row.unit, approved: row.approved, email: row.id === user.id ? ownProfile.email : row.email ?? '',
+    id: row.id, role: row.role, name: row.name,
+    phone: ownProfile.role === 'admin' || row.id === user.id ? row.phone ?? '' : '',
+    phoneLast4: row.phone_last4 ?? row.phone?.slice(-4) ?? '', building: row.building,
+    unit: row.unit, approved: row.approved, householdId: row.household_id, membershipStatus: row.membership_status,
+  }))
+  const registrationRequests = (registrationsResult.data ?? []).map((row) => {
+    const applicant = users.find((profile) => profile.id === row.applicant_id)
+    return {
+      id: row.id,
+      applicantId: row.applicant_id,
+      householdId: row.household_id,
+      building: applicant?.building ?? '',
+      unit: applicant?.unit ?? '',
+      phone: row.phone,
+      phoneLast4: row.phone_last4,
+      requestType: row.request_type,
+      previousResidentId: row.previous_resident_id,
+      createdAt: formatDateTime(row.created_at),
+    }
+  })
+  const households = (householdsResult.data ?? []).map((row) => ({
+    id: row.id,
+    building: String(row.building),
+    unit: String(row.unit),
+    area: Number(row.area_sqm),
+    currentResidentId: row.current_resident_id,
   }))
   const complaints = (complaintsResult.data ?? []).map((row) => {
     const comments = (row.complaint_comments ?? []) as CommentRow[]
@@ -114,11 +158,17 @@ export async function fetchAppState() {
     const items = (row.monthly_items ?? []) as MonthlyItemRow[]
     return { kind: row.kind, month: row.month.slice(0, 7), total: Number(row.total), previous: Number(row.previous), items: items.sort((a, b) => a.sort_order - b.sort_order).map((item) => [item.name, Number(item.current_amount), Number(item.previous_amount)]) }
   })
-  return { currentUserId: user.id, users, complaints, notices, fees: mappedRecords.filter((row) => row.kind === 'fee'), income: mappedRecords.filter((row) => row.kind === 'income') }
+  return { currentUserId: user.id, users, households, registrationRequests, complaints, notices, fees: mappedRecords.filter((row) => row.kind === 'fee'), income: mappedRecords.filter((row) => row.kind === 'income') }
 }
 
-export async function approveUser(id: string) {
-  const { error } = await client().from('profiles').update({ approved: true }).eq('id', id)
+export async function approveUser(requestId: number) {
+  const { data, error } = await client().rpc('approve_registration', { request_id: requestId })
+  if (error) throw error
+  return data?.[0] as { approved_household_id: number; resident_replaced: boolean } | undefined
+}
+
+export async function rejectRegistration(requestId: number) {
+  const { error } = await client().rpc('reject_registration', { request_id: requestId })
   if (error) throw error
 }
 
@@ -150,9 +200,7 @@ export async function createNotice(input: { category: string; title: string; bod
   if (error) throw error
 }
 
-export async function updateProfile(id: string, input: { name: string; phone: string; password?: string }) {
-  const { error } = await client().from('profiles').update({ name: input.name, phone: input.phone }).eq('id', id)
-  if (error) throw error
+export async function updateProfile(input: { password?: string }) {
   if (input.password) {
     const { error: passwordError } = await client().auth.updateUser({ password: input.password })
     if (passwordError) throw passwordError

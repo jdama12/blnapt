@@ -1,0 +1,8 @@
+project_id = "uiuywvpwuwrsyowhotvz"
+
+[functions.resident-register]
+verify_jwt = false
+
+[functions.resident-login]
+verify_jwt = false
+

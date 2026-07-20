@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, requestPasswordReset, signIn, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, signIn, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -20,7 +20,7 @@ export function mountApartmentPrototype(
         complete: { label: "처리완료", className: "status-complete", progress: 100 }
       };
   
-      const emptyState = { currentUserId: null, users: [], complaints: [], notices: [], fees: [], income: [] };
+      const emptyState = { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] };
       let state = structuredClone(emptyState);
       let loading = true;
       let loadError = "";
@@ -32,6 +32,7 @@ export function mountApartmentPrototype(
       let complaintStatusFilter = "all";
       let noticeCategory = "전체";
       let feeTab = "fee";
+      let householdBuildingFilter = "all";
   
       const app = appRoot;
       const modalRoot = modalRootElement;
@@ -180,90 +181,80 @@ export function mountApartmentPrototype(
       function renderLoginForm() {
         return `
           <h2>로그인</h2>
-          <p class="lead">가입한 이메일과 비밀번호를 입력하세요.</p>
+          <p class="lead">승인된 세대 정보와 비밀번호를 입력하세요.</p>
           <form id="loginForm">
+            <div class="field-row">
+              <div class="field">
+                <label>동</label>
+                <input class="control" id="loginBuilding" inputmode="numeric" maxlength="3" placeholder="예: 101" required />
+              </div>
+              <div class="field">
+                <label>호수</label>
+                <input class="control" id="loginUnit" inputmode="numeric" maxlength="4" placeholder="예: 101" required />
+              </div>
+            </div>
             <div class="field">
-              <label>이메일</label>
-              <input class="control" id="loginEmail" type="email" autocomplete="email" placeholder="name@example.com" required />
+              <label>전화번호 뒤 4자리</label>
+              <input class="control" id="loginPhoneLast4" inputmode="numeric" autocomplete="tel-national" minlength="4" maxlength="4" placeholder="예: 1234" required />
             </div>
             <div class="field">
               <label>비밀번호</label>
-              <input class="control" type="password" id="loginPassword" placeholder="비밀번호" required />
+              <input class="control" type="password" id="loginPassword" autocomplete="current-password" placeholder="비밀번호" required />
             </div>
-            <div class="auth-help"><button class="auth-link-button" id="forgotPasswordBtn" type="button">비밀번호를 잊으셨나요?</button></div>
             <button class="btn btn-primary btn-block" type="submit">로그인</button>
           </form>
-          <div class="demo-box">회원가입 후 이메일 확인과 관리자의 가입 승인이 필요합니다.</div>
+          <div class="demo-box">비밀번호 분실 또는 입주민 변경은 관리사무소 확인 후 새 가입 요청으로 처리됩니다.</div>
         `;
       }
   
       function renderRegisterForm() {
         return `
           <h2>가입 요청</h2>
-          <p class="lead">가입 신청 후 관리자의 승인이 필요합니다.</p>
+          <p class="lead">전입카드 확인 후 관리자가 승인합니다.</p>
           <form id="registerForm">
-            <div class="field">
-              <label>이메일</label>
-              <input class="control" id="regEmail" type="email" autocomplete="email" placeholder="name@example.com" required />
-            </div>
             <div class="field-row">
               <div class="field">
                 <label>동</label>
-                <input class="control" id="regBuilding" inputmode="numeric" placeholder="예: 102" required />
+                <input class="control" id="regBuilding" inputmode="numeric" maxlength="3" placeholder="예: 101" required />
               </div>
               <div class="field">
                 <label>호수</label>
-                <input class="control" id="regUnit" inputmode="numeric" placeholder="예: 1707" required />
+                <input class="control" id="regUnit" inputmode="numeric" maxlength="4" placeholder="예: 101" required />
               </div>
             </div>
             <div class="field">
-              <label>이름</label>
-              <input class="control" id="regName" placeholder="이름" required />
-            </div>
-            <div class="field">
               <label>전화번호</label>
-              <input class="control" id="regPhone" inputmode="tel" placeholder="01012345678" required />
+              <input class="control" id="regPhone" inputmode="tel" autocomplete="tel-national" minlength="10" maxlength="13" placeholder="예: 010-1234-5678" required />
             </div>
             <div class="field-row">
               <div class="field">
                 <label>비밀번호</label>
-                <input class="control" type="password" id="regPassword" minlength="6" placeholder="6자 이상" required />
+                <input class="control" type="password" id="regPassword" minlength="8" maxlength="72" autocomplete="new-password" placeholder="8자 이상" required />
               </div>
               <div class="field">
                 <label>비밀번호 확인</label>
-                <input class="control" type="password" id="regPassword2" minlength="6" placeholder="다시 입력" required />
+                <input class="control" type="password" id="regPassword2" minlength="8" maxlength="72" autocomplete="new-password" placeholder="다시 입력" required />
               </div>
             </div>
             <button class="btn btn-primary btn-block" type="submit">가입 승인 요청</button>
           </form>
+          <div class="demo-box">이미 입주민이 등록된 세대는 관리자 화면에 <b>입주민 변경</b> 요청으로 표시됩니다.</div>
         `;
       }
   
       function bindLogin() {
-        document.getElementById("forgotPasswordBtn").addEventListener("click", async e => {
-          const button = e.currentTarget;
-          const emailInput = document.getElementById("loginEmail");
-          const email = emailInput.value.trim() || window.prompt("가입한 이메일을 입력하세요.", "")?.trim();
-          if (!email) return;
-          button.disabled = true;
-          try {
-            await requestPasswordReset(email);
-            toast("비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해 주세요.");
-          } catch (error) {
-            handleError(error, "비밀번호 재설정 메일을 보내지 못했습니다.");
-          } finally {
-            button.disabled = false;
-          }
-        });
-
         document.getElementById("loginForm").addEventListener("submit", async e => {
           e.preventDefault();
           const submitButton = e.submitter;
           submitButton.disabled = true;
-          const email = document.getElementById("loginEmail").value.trim();
-          const password = document.getElementById("loginPassword").value;
+          const input = {
+            building: document.getElementById("loginBuilding").value.replace(/\D/g, ""),
+            unit: document.getElementById("loginUnit").value.replace(/\D/g, ""),
+            phoneLast4: document.getElementById("loginPhoneLast4").value.replace(/\D/g, ""),
+            password: document.getElementById("loginPassword").value,
+          };
           try {
-            const profile = await signIn(email, password);
+            const profile = await signIn(input);
             await refreshState();
             navigate("dashboard");
             toast(`${profile.name}님, 환영합니다.`);
@@ -279,19 +270,20 @@ export function mountApartmentPrototype(
           e.preventDefault();
           const submitButton = e.submitter;
           submitButton.disabled = true;
-          const email = document.getElementById("regEmail").value.trim();
           const building = document.getElementById("regBuilding").value.trim();
           const unit = document.getElementById("regUnit").value.trim();
-          const name = document.getElementById("regName").value.trim();
           const phone = document.getElementById("regPhone").value.replace(/\D/g, "");
           const password = document.getElementById("regPassword").value;
           const password2 = document.getElementById("regPassword2").value;
-          if (password !== password2) return toast("비밀번호 확인이 일치하지 않습니다.");
+          if (password !== password2) {
+            submitButton.disabled = false;
+            return toast("비밀번호 확인이 일치하지 않습니다.");
+          }
           try {
-            await signUp({ email, password, name, phone, building, unit });
+            await signUp({ building, unit, phone, password });
             authTab = "login";
             renderAuth();
-            toast("가입 요청이 접수되었습니다. 이메일 확인 후 관리자 승인을 기다려 주세요.");
+            toast("가입 요청이 접수되었습니다. 관리자 승인을 기다려 주세요.");
           } catch (error) {
             handleError(error, "가입 요청을 처리하지 못했습니다.");
             submitButton.disabled = false;
@@ -420,7 +412,7 @@ export function mountApartmentPrototype(
         const all = user.role === "admin" ? state.complaints : state.complaints.filter(c => c.authorId === user.id);
         const active = all.filter(c => c.status !== "complete");
         const complete = all.filter(c => c.status === "complete");
-        const pendingUsers = state.users.filter(u => !u.approved).length;
+        const pendingUsers = state.registrationRequests.length;
         const latestFee = state.fees[0];
         return `
           <div class="page-head">
@@ -728,20 +720,41 @@ export function mountApartmentPrototype(
       }
   
       function renderAdmin() {
-        const pending = state.users.filter(u => !u.approved);
+        const pending = state.registrationRequests;
         const complaints = state.complaints.slice().sort((a,b)=>b.id-a.id);
+        const occupiedCount = state.households.filter(h => h.currentResidentId).length;
+        const visibleHouseholds = householdBuildingFilter === "all"
+          ? state.households
+          : state.households.filter(h => h.building === householdBuildingFilter);
         return `
           <div class="page-head"><div><h2>관리자</h2><p>회원 승인과 민원 업무를 관리합니다.</p></div></div>
+          <div class="grid grid-4" style="margin-bottom:18px;">
+            <div class="card metric"><div class="label">전체 세대</div><div class="value">${state.households.length}</div></div>
+            <div class="card metric"><div class="label">입주 등록</div><div class="value">${occupiedCount}</div></div>
+            <div class="card metric"><div class="label">미등록 세대</div><div class="value">${state.households.length - occupiedCount}</div></div>
+            <div class="card metric"><div class="label">입주민 변경 요청</div><div class="value">${pending.filter(item => item.requestType === "replacement").length}</div></div>
+          </div>
           <div class="grid grid-2">
             <section class="card">
               <div class="section-title"><div><h3>가입 승인 요청</h3><p>동·호수 확인 후 승인하세요.</p></div><span class="status-pill status-pending">${pending.length}건</span></div>
               <div class="card-body">
-                ${pending.length ? pending.map(u=>`
-                  <div class="pending-user">
-                    <div><strong>${escapeHtml(u.building)}동 ${escapeHtml(u.unit)}호 · ${escapeHtml(u.name)}</strong><span>${formatPhone(u.phone)} · 가입 승인 대기</span></div>
-                    <div><button class="btn btn-primary btn-sm" data-approve-user="${u.id}">승인</button></div>
-                  </div>
-                `).join("") : renderEmpty("승인 대기 중인 회원이 없습니다.")}
+                ${pending.length ? pending.map(request => {
+                  const previous = request.previousResidentId ? state.users.find(u => u.id === request.previousResidentId) : null;
+                  const replacement = request.requestType === "replacement";
+                  return `
+                    <div class="pending-user ${replacement ? "replacement-request" : ""}">
+                      <div>
+                        <strong>${escapeHtml(request.building)}동 ${escapeHtml(request.unit)}호 ${replacement ? '<span class="status-pill status-high">입주민 변경</span>' : ''}</strong>
+                        <span>${formatPhone(request.phone)} · ${escapeHtml(request.createdAt)}</span>
+                        ${previous ? `<span>현재 입주민: ${escapeHtml(previous.name)} · ${formatPhone(previous.phone)}</span>` : ''}
+                      </div>
+                      <div class="pending-actions">
+                        <button class="btn btn-secondary btn-sm" data-reject-registration="${request.id}">거절</button>
+                        <button class="btn btn-primary btn-sm" data-approve-registration="${request.id}">승인</button>
+                      </div>
+                    </div>
+                  `;
+                }).join("") : renderEmpty("승인 대기 중인 가입 요청이 없습니다.")}
               </div>
             </section>
   
@@ -758,7 +771,35 @@ export function mountApartmentPrototype(
               </div>
             </section>
           </div>
-  
+
+          <section class="card" style="margin-top:18px;">
+            <div class="section-title">
+              <div><h3>동·호수별 세대 현황</h3><p>엑셀 원본 기준 734세대의 현재 입주 상태</p></div>
+              <select class="control compact-select" id="householdBuildingFilter">
+                <option value="all" ${householdBuildingFilter === "all" ? "selected" : ""}>전체 동</option>
+                ${["101","102","103","104","105","106","107"].map(building => `<option value="${building}" ${householdBuildingFilter === building ? "selected" : ""}>${building}동</option>`).join("")}
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>동</th><th>호수</th><th>공급면적</th><th>입주 상태</th><th>현재 입주민</th></tr></thead>
+                <tbody>
+                  ${visibleHouseholds.map(household => {
+                    const resident = household.currentResidentId ? state.users.find(user => user.id === household.currentResidentId) : null;
+                    const waiting = pending.some(request => request.householdId === household.id);
+                    return `<tr>
+                      <td>${escapeHtml(household.building)}동</td>
+                      <td><strong>${escapeHtml(household.unit)}호</strong></td>
+                      <td>${household.area.toFixed(2)}㎡</td>
+                      <td>${resident ? '<span class="status-pill status-complete">입주 등록</span>' : waiting ? '<span class="status-pill status-pending">승인 대기</span>' : '<span class="status-pill">미등록</span>'}</td>
+                      <td>${resident ? `${escapeHtml(resident.name)} · ${formatPhone(resident.phone)}` : '-'}</td>
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="card" style="margin-top:18px;">
             <div class="section-title"><div><h3>최근 민원 관리</h3><p>민원을 선택해 상태와 처리내용을 변경하세요.</p></div><button class="btn btn-primary btn-sm" id="newComplaintBtn">＋ 관리자 민원 등록</button></div>
             <div class="card-body">
@@ -772,6 +813,7 @@ export function mountApartmentPrototype(
         return `<div class="empty-state"><div class="empty-icon">○</div>${escapeHtml(message)}</div>`;
       }
       function formatPhone(phone) {
+        if (phone?.length === 4) return `뒤 4자리 ${phone}`;
         if (!phone || phone.length !== 11) return phone;
         return `${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7)}`;
       }
@@ -807,17 +849,38 @@ export function mountApartmentPrototype(
         if (newNoticeBtn) newNoticeBtn.addEventListener("click", openNoticeForm);
         const editProfileBtn = document.getElementById("editProfileBtn");
         if (editProfileBtn) editProfileBtn.addEventListener("click", openProfileForm);
-        document.querySelectorAll("[data-approve-user]").forEach(btn => {
+        const householdFilter = document.getElementById("householdBuildingFilter");
+        if (householdFilter) householdFilter.addEventListener("change", e => {
+          householdBuildingFilter = e.target.value;
+          render();
+        });
+        document.querySelectorAll("[data-approve-registration]").forEach(btn => {
           btn.addEventListener("click", async e => {
             e.stopPropagation();
-            const user = state.users.find(u => u.id === btn.dataset.approveUser);
-            if (!user) return;
+            const request = state.registrationRequests.find(item => String(item.id) === btn.dataset.approveRegistration);
+            if (!request) return;
+            const replacement = request.requestType === "replacement";
+            if (replacement && !window.confirm(`${request.building}동 ${request.unit}호의 기존 입주민을 종료하고 새 입주민으로 교체할까요?`)) return;
             try {
-              await approveUser(user.id);
+              await approveUser(request.id);
               await refreshState();
-              toast(`${user.building}동 ${user.unit}호 ${user.name}님을 승인했습니다.`);
+              toast(`${request.building}동 ${request.unit}호 ${replacement ? "입주민을 교체했습니다." : "가입을 승인했습니다."}`);
             } catch (error) {
               handleError(error, "가입 승인을 처리하지 못했습니다.");
+            }
+          });
+        });
+        document.querySelectorAll("[data-reject-registration]").forEach(btn => {
+          btn.addEventListener("click", async e => {
+            e.stopPropagation();
+            const request = state.registrationRequests.find(item => String(item.id) === btn.dataset.rejectRegistration);
+            if (!request || !window.confirm(`${request.building}동 ${request.unit}호의 가입 요청을 거절할까요?`)) return;
+            try {
+              await rejectRegistration(request.id);
+              await refreshState();
+              toast("가입 요청을 거절했습니다.");
+            } catch (error) {
+              handleError(error, "가입 거절을 처리하지 못했습니다.");
             }
           });
         });
@@ -1077,8 +1140,7 @@ export function mountApartmentPrototype(
                 <div class="field"><label>동</label><input class="control" value="${escapeHtml(user.building)}" disabled /></div>
                 <div class="field"><label>호수</label><input class="control" value="${escapeHtml(user.unit)}" disabled /></div>
               </div>
-              <div class="field"><label>이름</label><input class="control" id="profileName" value="${escapeHtml(user.name)}" required /></div>
-              <div class="field"><label>전화번호</label><input class="control" id="profilePhone" value="${escapeHtml(user.phone)}" required /></div>
+              <div class="field"><label>전화번호 뒤 4자리</label><input class="control" value="${escapeHtml(user.phone)}" disabled /></div>
               <div class="field"><label>새 비밀번호</label><input class="control" type="password" id="profilePassword" placeholder="변경하지 않으려면 비워두세요." /></div>
             </div>
             <div class="modal-foot"><button class="btn btn-secondary" type="button" data-close-modal>취소</button><button class="btn btn-primary" type="submit">저장</button></div>
@@ -1087,9 +1149,7 @@ export function mountApartmentPrototype(
         document.getElementById("profileForm").addEventListener("submit", async e => {
           e.preventDefault();
           try {
-            await updateProfile(user.id, {
-              name: document.getElementById("profileName").value.trim(),
-              phone: document.getElementById("profilePhone").value.replace(/\D/g,""),
+            await updateProfile({
               password: document.getElementById("profilePassword").value || undefined,
             });
             await refreshState();
