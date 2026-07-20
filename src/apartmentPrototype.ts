@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, signIn, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
+import { addComplaintComment, approveUser, createComplaint, createNotice, fetchAppState, getSessionUser, rejectRegistration, signIn, signInAdmin, signOut, signUp, updateComplaintStatus, updateProfile } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -129,6 +129,7 @@ export function mountApartmentPrototype(
       }
   
       function renderAuth() {
+        const adminMode = currentRoute === "adminLogin";
         app.innerHTML = `
           <section class="auth-wrap">
             <div class="auth-visual">
@@ -155,15 +156,17 @@ export function mountApartmentPrototype(
                 <div class="brand-lockup" style="margin-bottom:22px;">
                   <div class="brand-mark">APT</div>
                   <div>
-                    <div class="brand-title">보라매롯데낙천대 아파트 생활지원</div>
-                    <div class="brand-sub">입주민 생활지원 서비스</div>
+                    <div class="brand-title">${adminMode ? '보라매롯데낙천대 관리사무소' : '보라매롯데낙천대 아파트 생활지원'}</div>
+                    <div class="brand-sub">${adminMode ? '관리자 전용 시스템' : '입주민 생활지원 서비스'}</div>
                   </div>
                 </div>
-                <div class="auth-tabs">
-                  <button class="auth-tab ${authTab === "login" ? "active" : ""}" data-auth-tab="login">로그인</button>
-                  <button class="auth-tab ${authTab === "register" ? "active" : ""}" data-auth-tab="register">회원가입</button>
-                </div>
-                ${authTab === "login" ? renderLoginForm() : renderRegisterForm()}
+                ${adminMode ? '' : `
+                  <div class="auth-tabs">
+                    <button class="auth-tab ${authTab === "login" ? "active" : ""}" data-auth-tab="login">로그인</button>
+                    <button class="auth-tab ${authTab === "register" ? "active" : ""}" data-auth-tab="register">회원가입</button>
+                  </div>
+                `}
+                ${adminMode ? renderAdminLoginForm() : (authTab === "login" ? renderLoginForm() : renderRegisterForm())}
               </div>
             </div>
           </section>
@@ -174,7 +177,8 @@ export function mountApartmentPrototype(
             renderAuth();
           });
         });
-        if (authTab === "login") bindLogin();
+        if (adminMode) bindAdminLogin();
+        else if (authTab === "login") bindLogin();
         else bindRegister();
       }
   
@@ -204,6 +208,26 @@ export function mountApartmentPrototype(
             <button class="btn btn-primary btn-block" type="submit">로그인</button>
           </form>
           <div class="demo-box">비밀번호 분실 또는 입주민 변경은 관리사무소 확인 후 새 가입 요청으로 처리됩니다.</div>
+          <button class="btn btn-secondary btn-block" type="button" id="goAdminLogin" style="margin-top:12px;">관리자 로그인</button>
+        `;
+      }
+
+      function renderAdminLoginForm() {
+        return `
+          <h2>관리자 로그인</h2>
+          <p class="lead">관리사무소에 등록된 관리자 계정으로 로그인하세요.</p>
+          <form id="adminLoginForm">
+            <div class="field">
+              <label>관리자 이메일</label>
+              <input class="control" type="email" id="adminEmail" autocomplete="username" placeholder="admin@example.com" required />
+            </div>
+            <div class="field">
+              <label>비밀번호</label>
+              <input class="control" type="password" id="adminPassword" autocomplete="current-password" placeholder="비밀번호" required />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">관리자 로그인</button>
+          </form>
+          <button class="btn btn-secondary btn-block" type="button" id="goResidentLogin" style="margin-top:12px;">입주민 로그인으로 돌아가기</button>
         `;
       }
   
@@ -243,6 +267,7 @@ export function mountApartmentPrototype(
       }
   
       function bindLogin() {
+        document.getElementById("goAdminLogin").addEventListener("click", () => navigate("adminLogin"));
         document.getElementById("loginForm").addEventListener("submit", async e => {
           e.preventDefault();
           const submitButton = e.submitter;
@@ -260,6 +285,27 @@ export function mountApartmentPrototype(
             toast(`${profile.name}님, 환영합니다.`);
           } catch (error) {
             handleError(error, "로그인 정보가 일치하지 않습니다.");
+            submitButton.disabled = false;
+          }
+        });
+      }
+
+      function bindAdminLogin() {
+        document.getElementById("goResidentLogin").addEventListener("click", () => navigate("login"));
+        document.getElementById("adminLoginForm").addEventListener("submit", async e => {
+          e.preventDefault();
+          const submitButton = e.submitter;
+          submitButton.disabled = true;
+          try {
+            const admin = await signInAdmin(
+              document.getElementById("adminEmail").value,
+              document.getElementById("adminPassword").value,
+            );
+            await refreshState();
+            navigate("admin");
+            toast(`${admin.name} 관리자님, 환영합니다.`);
+          } catch (error) {
+            handleError(error, "관리자 로그인 정보가 일치하지 않습니다.");
             submitButton.disabled = false;
           }
         });
@@ -1164,10 +1210,11 @@ export function mountApartmentPrototype(
       render();
       bootstrap().then(() => {
         const mountedUser = currentUser();
-        if (!mountedUser && initialRoute !== "login") {
+        const isAuthRoute = initialRoute === "login" || initialRoute === "adminLogin";
+        if (!mountedUser && !isAuthRoute) {
           onNavigate("login", { replace: true });
-        } else if (mountedUser && initialRoute === "login") {
-          onNavigate("dashboard", { replace: true });
+        } else if (mountedUser && isAuthRoute) {
+          onNavigate(mountedUser.role === "admin" ? "admin" : "dashboard", { replace: true });
         } else if (mountedUser?.role !== "admin" && initialRoute === "admin") {
           onNavigate("dashboard", { replace: true });
         }

@@ -40,7 +40,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 
 ## 로그인과 가입 처리
 
-로그인 입력값은 다음 네 가지입니다.
+입주민 로그인 주소는 `/login`이며 입력값은 다음 네 가지입니다.
 
 1. 동
 2. 호수
@@ -57,6 +57,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 
 전화번호 뒤 4자리는 단독 인증 수단이 아닙니다. 동·호·뒤 4자리로 내부 계정을 찾은 뒤 Supabase Auth가 비밀번호를 검증합니다.
 
+관리자 로그인은 `/admin/login`에서 완전히 분리됩니다. 관리자는 동·호수와 관계없는 이메일·비밀번호를 사용하며, 관리자 정보와 활성 여부는 `admin_accounts`가 기준입니다. 기존 FK 호환용 `profiles` 행은 남아 있지만 734세대의 현재 입주민으로 집계되지 않습니다.
+
 ## Supabase 적용
 
 기존 프로젝트에서는 SQL Editor의 `postgres` 역할로 다음 파일을 순서대로 적용합니다. 이미 실행한 파일은 다시 실행하지 않습니다.
@@ -65,8 +67,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 2. `202607160002_authenticated_grants.sql`
 3. `202607160003_allow_postgres_profile_admin.sql`
 4. `202607200001_households_and_residency.sql`
+5. `202607200002_separate_admin_accounts.sql`
 
-이번 변경에서는 4번 파일만 새로 실행하면 됩니다. 실행 후 검증 SQL:
+이미 4번까지 실행한 프로젝트에서는 5번 파일만 새로 실행합니다. 실행 후 검증 SQL:
 
 ```sql
 select building, count(*) as household_count
@@ -93,7 +96,7 @@ Edge Functions에는 Supabase가 제공하는 `SUPABASE_URL`, `SUPABASE_ANON_KEY
 
 ## 최초 관리자
 
-기존 활성 관리자는 마이그레이션 후에도 그대로 유지됩니다. 완전히 새 프로젝트라면 다음 순서로 첫 관리자를 만듭니다.
+기존 활성 관리자의 이메일과 비밀번호는 마이그레이션 후에도 그대로 유지되며 `/admin/login`에서 사용합니다. 완전히 새 프로젝트라면 다음 순서로 첫 관리자를 만듭니다.
 
 1. 사이트에서 동·호·전화번호 뒤 4자리와 비밀번호로 가입 요청
 2. SQL Editor에서 해당 요청을 최초 관리자로 승인
@@ -102,7 +105,11 @@ Edge Functions에는 Supabase가 제공하는 `SUPABASE_URL`, `SUPABASE_ANON_KEY
 select public.bootstrap_first_admin(101, 101, '1234');
 ```
 
-인수는 실제 관리자 세대의 동, 호수, 전화번호 뒤 4자리로 바꿉니다. 활성 관리자가 이미 있으면 이 함수는 실행을 거부합니다.
+인수는 최초 관리자 가입 요청에 사용한 동, 호수, 전화번호 뒤 4자리로 바꿉니다. 이 요청은 관리자 계정으로 전환되며 해당 세대를 점유하지 않습니다. 활성 관리자가 이미 있으면 함수는 실행을 거부합니다. 이 방식으로 만든 계정의 내부 로그인 이메일은 SQL Editor에서 다음과 같이 확인할 수 있습니다.
+
+```sql
+select email from public.admin_accounts where active = true;
+```
 
 ## 환경변수
 

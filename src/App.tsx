@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AdminPage from './pages/AdminPage'
+import AdminLoginPage from './pages/AdminLoginPage'
 import ComplaintsPage from './pages/ComplaintsPage'
 import DashboardPage from './pages/DashboardPage'
 import FeesPage from './pages/FeesPage'
@@ -13,6 +14,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/complaints" element={<ComplaintsPage />} />
         <Route path="/notices" element={<NoticesPage />} />

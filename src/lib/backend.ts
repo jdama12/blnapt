@@ -67,6 +67,27 @@ export async function signIn(input: ResidentCredentials) {
   return profile
 }
 
+export async function signInAdmin(email: string, password: string) {
+  const { data, error } = await client().auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  })
+  if (error) throw error
+  if (!data.user) throw new Error('관리자 로그인 세션을 만들지 못했습니다.')
+
+  const { data: admin, error: adminError } = await client()
+    .from('admin_accounts')
+    .select('*')
+    .eq('id', data.user.id)
+    .maybeSingle()
+  if (adminError) throw adminError
+  if (!admin?.active) {
+    await client().auth.signOut()
+    throw new Error('사용 가능한 관리자 계정이 아닙니다.')
+  }
+  return admin
+}
+
 export async function signUp(input: ResidentRegistration) {
   await invokeResidentFunction<{ ok: true }>('resident-register', input)
 }
@@ -80,20 +101,34 @@ export async function fetchAppState() {
   const user = await getSessionUser()
   if (!user) return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
 
-  const { data: ownProfile, error: ownProfileError } = await client().from('profiles').select('*').eq('id', user.id).single()
-  if (ownProfileError) throw ownProfileError
-  if (!ownProfile.approved || ownProfile.membership_status !== 'active') {
+  const [adminResult, profileResult] = await Promise.all([
+    client().from('admin_accounts').select('*').eq('id', user.id).maybeSingle(),
+    client().from('profiles').select('*').eq('id', user.id).maybeSingle(),
+  ])
+  if (adminResult.error) throw adminResult.error
+  if (profileResult.error) throw profileResult.error
+
+  const adminAccount = adminResult.data
+  const ownProfile = profileResult.data
+  const isAdminAccount = Boolean(adminAccount?.active)
+  const isActiveResident = Boolean(
+    ownProfile?.role === 'resident'
+      && ownProfile.approved
+      && ownProfile.membership_status === 'active',
+  )
+  if (!isAdminAccount && !isActiveResident) {
     await client().auth.signOut()
     return { currentUserId: null, users: [], households: [], registrationRequests: [], complaints: [], notices: [], fees: [], income: [] }
   }
-  const profilesQuery = ownProfile.role === 'admin'
+
+  const profilesQuery = isAdminAccount
     ? client().from('profiles').select('*').order('created_at')
     : client().from('profile_directory').select('*').order('created_at')
 
-  const registrationRequestsPromise = ownProfile.role === 'admin'
+  const registrationRequestsPromise = isAdminAccount
     ? client().from('registration_requests').select('*').eq('status', 'pending').order('created_at')
     : Promise.resolve({ data: [], error: null })
-  const householdsPromise = ownProfile.role === 'admin'
+  const householdsPromise = isAdminAccount
     ? client().from('households').select('*').order('building').order('unit')
     : Promise.resolve({ data: [], error: null })
 
@@ -114,12 +149,26 @@ export async function fetchAppState() {
     if (data?.signedUrl) signedUrls.set(path, data.signedUrl)
   }))
 
-  const users = (profilesResult.data ?? []).map((row) => ({
+  const users = (profilesResult.data ?? []).filter((row) => row.role !== 'admin').map((row) => ({
     id: row.id, role: row.role, name: row.name,
-    phone: ownProfile.role === 'admin' || row.id === user.id ? row.phone ?? '' : '',
+    phone: isAdminAccount || row.id === user.id ? row.phone ?? '' : '',
     phoneLast4: row.phone_last4 ?? row.phone?.slice(-4) ?? '', building: row.building,
     unit: row.unit, approved: row.approved, householdId: row.household_id, membershipStatus: row.membership_status,
   }))
+  if (isAdminAccount) {
+    users.push({
+      id: user.id,
+      role: 'admin',
+      name: adminAccount.name,
+      phone: adminAccount.phone ?? '',
+      phoneLast4: '',
+      building: '관리',
+      unit: '사무소',
+      approved: true,
+      householdId: null,
+      membershipStatus: 'active',
+    })
+  }
   const registrationRequests = (registrationsResult.data ?? []).map((row) => {
     const applicant = users.find((profile) => profile.id === row.applicant_id)
     return {
