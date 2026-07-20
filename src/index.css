@@ -352,7 +352,8 @@
     .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
     .detail-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
     .detail-value { font-weight: 650; }
-    .resident-building-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 16px; scrollbar-width: thin; }
+    .resident-list-toolbar { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+    .resident-building-tabs { display: flex; flex: 1 1 auto; min-width: 0; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: thin; }
     .resident-building-tab { flex: 0 0 auto; min-width: 78px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
     .resident-building-tab:hover { border-color: var(--primary); color: var(--primary); }
     .resident-building-tab.active { border-color: var(--primary); background: var(--primary); color: #fff; }
@@ -364,6 +365,8 @@
     .resident-avatar { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 22px; background: var(--primary-soft); color: var(--primary); font-size: 22px; font-weight: 800; }
     .resident-custom-fields { display: grid; gap: 10px; margin-top: 16px; }
     .resident-custom-field { display: grid; grid-template-columns: minmax(130px,.55fr) minmax(180px,1fr) auto; gap: 10px; align-items: end; }
+    .resident-unit-search { display: flex; flex: 0 0 auto; gap: 8px; align-items: center; }
+    .resident-unit-search .control { width: 140px; min-height: 40px; }
     .photo-box {
       min-height: 180px; background: #f1f5f9; border-radius: 14px; display: grid; place-items: center;
       overflow: hidden; color: var(--muted);
@@ -560,6 +563,9 @@
       .toolbar .btn { width: 100%; }
       .detail-grid { grid-template-columns: 1fr; }
       .resident-custom-field { grid-template-columns: 1fr; }
+      .resident-list-toolbar { flex-direction: column; }
+      .resident-building-tabs, .resident-unit-search { width: 100%; }
+      .resident-unit-search .control { width: auto; flex: 1 1 auto; }
       .comment-form { flex-direction: column; }
       .admin-banner { align-items: flex-start; flex-direction: column; }
       .profile-card { align-items: flex-start; }
