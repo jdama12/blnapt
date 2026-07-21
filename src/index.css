@@ -292,6 +292,10 @@
     .dashboard-notice-title { font-weight: 750; line-height: 1.45; }
     .dashboard-notice-title span { color: var(--primary); }
     .dashboard-notice-date { margin-top: 6px; color: var(--muted); font-size: 12px; }
+    .integration-ready-state { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; }
+    .integration-ready-state h3 { margin: 4px 0 0; font-size: 22px; }
+    .integration-ready-state p { margin: 0; color: var(--muted); line-height: 1.75; }
+    .integration-ready-icon { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 24px; background: var(--primary-soft); color: var(--primary); font-size: 30px; font-weight: 800; }
 
     .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
     .quick-action {

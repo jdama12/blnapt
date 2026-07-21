@@ -129,7 +129,7 @@ export function mountApartmentPrototype(
                 ${renderRoute(user)}
               </main>
             </div>
-            ${renderBottomNav()}
+            ${renderBottomNav(user)}
           </div>
         `;
         bindGlobalEvents();
@@ -144,16 +144,16 @@ export function mountApartmentPrototype(
                 <div class="brand-mark">APT</div>
                 <div>
                   <div class="brand-title">보라매롯데낙천대 아파트 생활지원</div>
-                  <div class="brand-sub">민원 · 공고 · 관리비를 한곳에서</div>
+                  <div class="brand-sub">민원 · 공고 · 생활정보를 한곳에서</div>
                 </div>
               </div>
               <div class="hero-copy">
                 <h1>입주민과 관리사무소를<br/>더 빠르게 연결합니다.</h1>
-                <p>민원 접수부터 처리 과정, 아파트 공고와 관리비 내역까지 PC와 모바일에서 편리하게 확인하세요.</p>
+                <p>민원 접수부터 처리 과정과 아파트 공고까지 PC와 모바일에서 편리하게 확인하세요.</p>
                 <div class="hero-points">
                   <div class="hero-point"><div class="hero-icon">✓</div><div><b>실시간 민원 처리현황</b><br><span class="muted">댓글과 상태변경 이력을 한눈에 확인</span></div></div>
                   <div class="hero-point"><div class="hero-icon">▣</div><div><b>아파트 공고 통합</b><br><span class="muted">관리소·입대의·선관위·공문 통합관리</span></div></div>
-                  <div class="hero-point"><div class="hero-icon">₩</div><div><b>월별 관리비·수입 비교</b><br><span class="muted">전월 증감과 세부항목을 쉽게 비교</span></div></div>
+                  <div class="hero-point"><div class="hero-icon">₩</div><div><b>관리비 시스템 연동 준비중</b><br><span class="muted">안정적인 제공을 위해 연동을 준비하고 있습니다.</span></div></div>
                 </div>
               </div>
               <div class="muted">반응형 웹 · 하이브리드 앱 확장 고려 프로토타입</div>
@@ -430,7 +430,7 @@ export function mountApartmentPrototype(
           ["dashboard", "⌂", "대시보드"],
           ["complaints", "✎", "민원"],
           ["notices", "▣", "아파트 소식"],
-          ["fees", "₩", "관리비·수입"],
+          ["fees", "₩", user.role === "admin" ? "관리비·수입" : "관리비 (준비중)"],
           ["mypage", "●", "나의 페이지"]
         ];
         if (user.role === "admin") {
@@ -491,12 +491,12 @@ export function mountApartmentPrototype(
         `;
       }
   
-      function renderBottomNav() {
+      function renderBottomNav(user) {
         const navs = [
           ["dashboard", "⌂", "홈"],
           ["complaints", "✎", "민원"],
           ["notices", "▣", "소식"],
-          ["fees", "₩", "관리비"],
+          ["fees", "₩", user.role === "admin" ? "관리비" : "준비중"],
           ["mypage", "●", "MY"]
         ];
         return `
@@ -586,10 +586,17 @@ export function mountApartmentPrototype(
               <div class="label">새 공고</div><div class="value">${state.notices.filter(n=>n.pinned).length}</div>
               <div class="sub">중요 공고 기준</div><div class="metric-icon">▣</div>
             </div>
-            <div class="card metric">
-              <div class="label">${latestFee ? `${escapeHtml(latestFee.month)} 관리비` : "최근 관리비"}</div><div class="value" style="font-size:26px;">${latestFee ? `${fmtNumber(latestFee.total)}원` : "미등록"}</div>
-              <div class="sub">${latestFee ? (latestFee.total > latestFee.previous ? "전월 대비 증가" : "전월 대비 감소") : "관리비 데이터가 없습니다."}</div><div class="metric-icon">₩</div>
-            </div>
+            ${user.role === "admin" ? `
+              <div class="card metric">
+                <div class="label">${latestFee ? `${escapeHtml(latestFee.month)} 관리비` : "최근 관리비"}</div><div class="value" style="font-size:26px;">${latestFee ? `${fmtNumber(latestFee.total)}원` : "미등록"}</div>
+                <div class="sub">${latestFee ? (latestFee.total > latestFee.previous ? "전월 대비 증가" : "전월 대비 감소") : "관리비 데이터가 없습니다."}</div><div class="metric-icon">₩</div>
+              </div>
+            ` : `
+              <div class="card metric">
+                <div class="label">관리비 조회</div><div class="value" style="font-size:23px;">연동 준비중</div>
+                <div class="sub">서비스 오픈 후 안내드리겠습니다.</div><div class="metric-icon">₩</div>
+              </div>
+            `}
           </div>
   
           <div class="grid dashboard-main">
@@ -767,7 +774,18 @@ export function mountApartmentPrototype(
         `;
       }
   
-      function renderFees() {
+      function renderFees(user) {
+        if (user.role !== "admin") return `
+          <div class="page-head"><div><h2>관리비</h2><p>관리비 조회 시스템을 준비하고 있습니다.</p></div></div>
+          <section class="card">
+            <div class="card-body integration-ready-state">
+              <div class="integration-ready-icon">₩</div>
+              <span class="status-pill status-pending">서비스 준비중</span>
+              <h3>관리비 시스템 연동을 준비하고 있습니다.</h3>
+              <p>정확하고 안정적인 관리비 정보를 제공하기 위해 외부 시스템 연동 작업을 진행하고 있습니다.<br/>서비스가 준비되면 공고를 통해 안내드리겠습니다.</p>
+            </div>
+          </section>
+        `;
         const data = feeTab === "fee" ? state.fees : state.income;
         const title = feeTab === "fee" ? "월별 관리비 부과내역" : "월별 수입내역";
         const latest = data[0];
