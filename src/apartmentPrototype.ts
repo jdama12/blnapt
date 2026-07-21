@@ -1486,19 +1486,58 @@ export function mountApartmentPrototype(
         }
       }
   
+      function noticeHistoryValue(field, value) {
+        if (field === "pinned") return value ? "중요 공고" : "일반 공고";
+        if (field === "has_image") return value ? "첨부 이미지 있음" : "첨부 이미지 없음";
+        if (value === null || value === undefined || value === "") return "없음";
+        return String(value);
+      }
+
+      function renderNoticeHistoryChanges(history) {
+        const labels = { category: "공고 분류", title: "제목", body: "내용", pinned: "중요 여부", has_image: "첨부 이미지" };
+        if (history.action === "created") {
+          return Object.entries(history.changes || {}).map(([field, value]) => `
+            <div class="notice-history-change">
+              <strong>${escapeHtml(labels[field] || field)}</strong>
+              <div class="notice-history-value">${escapeHtml(noticeHistoryValue(field, value))}</div>
+            </div>
+          `).join("");
+        }
+        return Object.entries(history.changes || {}).map(([field, change]) => `
+          <div class="notice-history-change">
+            <strong>${escapeHtml(labels[field] || field)}</strong>
+            <div class="notice-history-value"><span>이전</span>${escapeHtml(noticeHistoryValue(field, change.before))}</div>
+            <div class="notice-history-value is-after"><span>변경</span>${escapeHtml(noticeHistoryValue(field, change.after))}</div>
+          </div>
+        `).join("");
+      }
+
       function openNotice(id) {
         const n = state.notices.find(x=>x.id===id);
         if (!n) return;
+        const canManageNotice = currentUser().role === "admin";
         modal(`
           <div class="modal-head"><div><h3>${escapeHtml(n.title)}</h3><div class="muted" style="font-size:12px;">${escapeHtml(n.category)} · ${escapeHtml(n.date)}</div></div><button class="close-btn" data-close-modal>✕</button></div>
           <div class="modal-body">
             ${n.pinned?'<span class="status-pill status-pending" style="margin-bottom:12px;">중요 공고</span>':""}
             <div style="white-space:pre-wrap;line-height:1.8;">${escapeHtml(n.body)}</div>
             ${n.image ? `<div class="notice-detail-image-wrap"><img class="notice-detail-image" src="${escapeHtml(n.image)}" alt="${escapeHtml(n.title)} 첨부 이미지" /></div>` : ""}
+            ${canManageNotice ? `
+              <section class="notice-history-section">
+                <h4>변경 이력</h4>
+                ${n.history?.length ? `<div class="timeline">${n.history.map(history => `
+                  <div class="timeline-item">
+                    <div class="timeline-date">${escapeHtml(history.date)} · 관리자</div>
+                    <div class="timeline-title">${history.action === "created" ? "최초 등록" : "공고 수정"}</div>
+                    <div class="notice-history-changes">${renderNoticeHistoryChanges(history)}</div>
+                  </div>
+                `).join("")}</div>` : '<div class="muted">기록된 변경 이력이 없습니다.</div>'}
+              </section>
+            ` : ""}
           </div>
           <div class="modal-foot">
             <button class="btn btn-secondary" data-close-modal>닫기</button>
-            ${currentUser().role === "admin" ? '<button class="btn btn-primary" id="editNoticeBtn">공고 수정</button>' : ''}
+            ${canManageNotice ? '<button class="btn btn-primary" id="editNoticeBtn">공고 수정</button>' : ''}
           </div>
         `, true);
         const editNoticeBtn = document.getElementById("editNoticeBtn");

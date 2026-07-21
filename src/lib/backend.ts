@@ -188,7 +188,7 @@ export async function fetchAppState() {
     registrationRequestsPromise,
     residentCardsPromise,
     client().from('complaints').select('*, complaint_comments(*), complaint_history(*)').order('created_at', { ascending: false }),
-    client().from('notices').select('*').order('pinned', { ascending: false }).order('published_at', { ascending: false }),
+    client().from('notices').select('*, notice_history(*)').order('pinned', { ascending: false }).order('published_at', { ascending: false }),
     client().from('monthly_records').select('*, monthly_items(*)').order('month', { ascending: false }),
   ])
   for (const result of [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
@@ -284,6 +284,15 @@ export async function fetchAppState() {
     body: row.body,
     image: row.image_path ? noticeSignedUrls.get(row.image_path) ?? '' : '',
     imagePath: row.image_path ?? '',
+    history: (row.notice_history ?? [])
+      .sort((a: { created_at: string; id: number }, b: { created_at: string; id: number }) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
+      .map((item: { id: number; action: string; changed_by: string | null; changes: Record<string, unknown>; created_at: string }) => ({
+        id: item.id,
+        action: item.action,
+        changedBy: item.changed_by,
+        changes: item.changes ?? {},
+        date: formatDateTime(item.created_at),
+      })),
   }))
   const mappedRecords = (recordsResult.data ?? []).map((row) => {
     const items = (row.monthly_items ?? []) as MonthlyItemRow[]
