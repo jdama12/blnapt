@@ -1512,6 +1512,26 @@ export function mountApartmentPrototype(
         `).join("");
       }
 
+      function openNoticeHistory(notice) {
+        modal(`
+          <div class="modal-head"><div><h3>공고 변경 이력</h3><div class="muted" style="font-size:12px;">${escapeHtml(notice.title)}</div></div><button class="close-btn" data-close-modal>✕</button></div>
+          <div class="modal-body">
+            ${notice.history?.length ? `<div class="timeline">${notice.history.map(history => `
+              <div class="timeline-item">
+                <div class="timeline-date">${escapeHtml(history.date)} · 관리자</div>
+                <div class="timeline-title">${history.action === "created" ? "최초 등록" : "공고 수정"}</div>
+                <div class="notice-history-changes">${renderNoticeHistoryChanges(history)}</div>
+              </div>
+            `).join("")}</div>` : '<div class="muted">기록된 변경 이력이 없습니다.</div>'}
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-secondary" data-close-modal>닫기</button>
+            <button class="btn btn-primary" id="backToNoticeBtn">공고로 돌아가기</button>
+          </div>
+        `, true);
+        document.getElementById("backToNoticeBtn").addEventListener("click", () => openNotice(notice.id));
+      }
+
       function openNotice(id) {
         const n = state.notices.find(x=>x.id===id);
         if (!n) return;
@@ -1522,24 +1542,15 @@ export function mountApartmentPrototype(
             ${n.pinned?'<span class="status-pill status-pending" style="margin-bottom:12px;">중요 공고</span>':""}
             <div style="white-space:pre-wrap;line-height:1.8;">${escapeHtml(n.body)}</div>
             ${n.image ? `<div class="notice-detail-image-wrap"><img class="notice-detail-image" src="${escapeHtml(n.image)}" alt="${escapeHtml(n.title)} 첨부 이미지" /></div>` : ""}
-            ${canManageNotice ? `
-              <section class="notice-history-section">
-                <h4>변경 이력</h4>
-                ${n.history?.length ? `<div class="timeline">${n.history.map(history => `
-                  <div class="timeline-item">
-                    <div class="timeline-date">${escapeHtml(history.date)} · 관리자</div>
-                    <div class="timeline-title">${history.action === "created" ? "최초 등록" : "공고 수정"}</div>
-                    <div class="notice-history-changes">${renderNoticeHistoryChanges(history)}</div>
-                  </div>
-                `).join("")}</div>` : '<div class="muted">기록된 변경 이력이 없습니다.</div>'}
-              </section>
-            ` : ""}
           </div>
           <div class="modal-foot">
             <button class="btn btn-secondary" data-close-modal>닫기</button>
+            ${canManageNotice ? '<button class="btn btn-secondary" id="noticeHistoryBtn">변경 이력</button>' : ''}
             ${canManageNotice ? '<button class="btn btn-primary" id="editNoticeBtn">공고 수정</button>' : ''}
           </div>
         `, true);
+        const noticeHistoryBtn = document.getElementById("noticeHistoryBtn");
+        if (noticeHistoryBtn) noticeHistoryBtn.addEventListener("click", () => openNoticeHistory(n));
         const editNoticeBtn = document.getElementById("editNoticeBtn");
         if (editNoticeBtn) editNoticeBtn.addEventListener("click", () => openNoticeForm(n));
       }

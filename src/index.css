@@ -425,8 +425,6 @@
     .notice-upload-preview img { display: block; width: 100%; height: auto; max-height: none; object-fit: contain; }
     .notice-detail-image-wrap { width: 100%; margin-top: 20px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
     .notice-detail-image { display: block; width: 100%; max-width: 100%; height: auto; margin: 0 auto; object-fit: contain; }
-    .notice-history-section { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
-    .notice-history-section h4 { margin: 0 0 16px; }
     .notice-history-changes { display: grid; gap: 8px; margin-top: 8px; }
     .notice-history-change { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
     .notice-history-change strong { display: block; margin-bottom: 5px; font-size: 12px; color: #334155; }
