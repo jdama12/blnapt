@@ -605,29 +605,45 @@ export function mountApartmentPrototype(
               </div>
             </section>
   
-            <div class="grid">
-              <section class="card">
-                <div class="section-title"><div><h3>빠른 메뉴</h3><p>자주 사용하는 기능입니다.</p></div></div>
-                <div class="card-body">
-                  <div class="quick-actions">
+            ${user.role === "admin" ? `
+              <div class="grid">
+                <section class="card">
+                  <div class="section-title"><div><h3>빠른 메뉴</h3><p>자주 사용하는 기능입니다.</p></div></div>
+                  <div class="card-body"><div class="quick-actions">
                     <button class="quick-action" id="quickComplaint"><div class="qa-icon">✎</div><strong>민원 작성</strong><span>사진과 위치 첨부</span></button>
                     <button class="quick-action" data-route="notices"><div class="qa-icon">▣</div><strong>공고 확인</strong><span>관리소·입대의 소식</span></button>
                     <button class="quick-action" data-route="fees"><div class="qa-icon">₩</div><strong>관리비</strong><span>전월 비교·상세내역</span></button>
                     <button class="quick-action" data-route="mypage"><div class="qa-icon">●</div><strong>나의 페이지</strong><span>과거 민원·회원정보</span></button>
-                  </div>
-                </div>
+                  </div></div>
+                </section>
+                <section class="card">
+                  <div class="section-title"><div><h3>최근 공고</h3><p>중요 공지부터 표시합니다.</p></div></div>
+                  <div class="card-body"><div class="notice-list">${state.notices.length ? state.notices.slice(0,3).map(renderNoticeItem).join("") : renderEmpty("등록된 공고가 없습니다.")}</div></div>
+                </section>
+              </div>
+            ` : `
+              <section class="card dashboard-notice-card">
+                <div class="section-title"><div><h3>최근 공고</h3><p>관리소·입대의·선관위의 최근 소식입니다.</p></div><button class="btn btn-secondary btn-sm" data-route="notices">전체보기</button></div>
+                <div class="card-body"><div class="dashboard-notice-list">${state.notices.length ? state.notices.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,7).map(renderDashboardNoticeItem).join("") : renderEmpty("등록된 공고가 없습니다.")}</div></div>
               </section>
-  
-              <section class="card">
-                <div class="section-title"><div><h3>최근 공고</h3><p>중요 공지부터 표시합니다.</p></div></div>
-                <div class="card-body">
-                  <div class="notice-list">
-                    ${state.notices.length ? state.notices.slice(0,3).map(renderNoticeItem).join("") : renderEmpty("등록된 공고가 없습니다.")}
-                  </div>
-                </div>
-              </section>
-            </div>
+            `}
           </div>
+        `;
+      }
+
+      function renderDashboardNoticeItem(notice) {
+        const categoryLabel = ({
+          "관리사무소": "관리소",
+          "입주자대표회의": "입대의",
+          "선거관리위원회": "선관위",
+          "정부기관": "정부기관",
+          "기타": "기타",
+        })[notice.category] || notice.category;
+        return `
+          <article class="dashboard-notice-item" data-notice-id="${notice.id}">
+            <div class="dashboard-notice-title"><span>[${escapeHtml(categoryLabel)}]</span> ${escapeHtml(notice.title)}</div>
+            <div class="dashboard-notice-date">게시일 ${escapeHtml(notice.date)}</div>
+          </article>
         `;
       }
   
