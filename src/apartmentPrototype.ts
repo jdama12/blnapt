@@ -1290,7 +1290,17 @@ export function mountApartmentPrototype(
       function modal(content, large=false) {
         modalRoot.innerHTML = `<div class="modal-backdrop" id="modalBackdrop"><div class="modal ${large?"modal-lg":""}">${content}</div></div>`;
         const backdrop = document.getElementById("modalBackdrop");
-        backdrop.addEventListener("click", e => { if (e.target === backdrop) closeModal(); });
+        let pointerStartedOnBackdrop = false;
+        backdrop.addEventListener("pointerdown", e => {
+          pointerStartedOnBackdrop = e.target === backdrop;
+        });
+        backdrop.addEventListener("pointercancel", () => {
+          pointerStartedOnBackdrop = false;
+        });
+        backdrop.addEventListener("click", e => {
+          if (pointerStartedOnBackdrop && e.target === backdrop) closeModal();
+          pointerStartedOnBackdrop = false;
+        });
         modalRoot.querySelectorAll("[data-close-modal]").forEach(btn=>btn.addEventListener("click", closeModal));
       }
       function closeModal() { modalRoot.innerHTML = ""; }
