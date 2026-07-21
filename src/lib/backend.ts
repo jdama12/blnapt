@@ -283,6 +283,7 @@ export async function fetchAppState() {
     pinned: row.pinned,
     body: row.body,
     image: row.image_path ? noticeSignedUrls.get(row.image_path) ?? '' : '',
+    imagePath: row.image_path ?? '',
   }))
   const mappedRecords = (recordsResult.data ?? []).map((row) => {
     const items = (row.monthly_items ?? []) as MonthlyItemRow[]
@@ -378,6 +379,37 @@ export async function createNotice(input: { category: string; title: string; bod
   if (error) {
     if (imagePath) await client().storage.from('notice-images').remove([imagePath])
     throw error
+  }
+}
+
+export async function updateNotice(input: { id: number; category: string; title: string; body: string; pinned: boolean; existingImagePath?: string; removeImage?: boolean; file?: File }) {
+  const user = await getSessionUser()
+  if (!user) throw new Error('로그인이 필요합니다.')
+
+  let nextImagePath = input.removeImage ? null : input.existingImagePath || null
+  let uploadedImagePath: string | null = null
+  if (input.file) {
+    uploadedImagePath = `${user.id}/${crypto.randomUUID()}-${input.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { error: uploadError } = await client().storage.from('notice-images').upload(uploadedImagePath, input.file)
+    if (uploadError) throw uploadError
+    nextImagePath = uploadedImagePath
+  }
+
+  const { error } = await client().from('notices').update({
+    category: input.category,
+    title: input.title,
+    body: input.body,
+    pinned: input.pinned,
+    image_path: nextImagePath,
+  }).eq('id', input.id)
+
+  if (error) {
+    if (uploadedImagePath) await client().storage.from('notice-images').remove([uploadedImagePath])
+    throw error
+  }
+
+  if (input.existingImagePath && input.existingImagePath !== nextImagePath) {
+    await client().storage.from('notice-images').remove([input.existingImagePath])
   }
 }
 

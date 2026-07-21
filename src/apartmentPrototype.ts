@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deactivateResident, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateProfile, updateResidentCardField } from './lib/backend'
+import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deactivateResident, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateNotice, updateProfile, updateResidentCardField } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -1247,7 +1247,7 @@ export function mountApartmentPrototype(
         const quickComplaint = document.getElementById("quickComplaint");
         if (quickComplaint) quickComplaint.addEventListener("click", openComplaintForm);
         const newNoticeBtn = document.getElementById("newNoticeBtn");
-        if (newNoticeBtn) newNoticeBtn.addEventListener("click", openNoticeForm);
+        if (newNoticeBtn) newNoticeBtn.addEventListener("click", () => openNoticeForm());
         const editProfileBtn = document.getElementById("editProfileBtn");
         if (editProfileBtn) editProfileBtn.addEventListener("click", openProfileForm);
         const householdFilter = document.getElementById("householdBuildingFilter");
@@ -1496,32 +1496,40 @@ export function mountApartmentPrototype(
             <div style="white-space:pre-wrap;line-height:1.8;">${escapeHtml(n.body)}</div>
             ${n.image ? `<div class="notice-detail-image-wrap"><img class="notice-detail-image" src="${escapeHtml(n.image)}" alt="${escapeHtml(n.title)} 첨부 이미지" /></div>` : ""}
           </div>
-          <div class="modal-foot"><button class="btn btn-secondary" data-close-modal>닫기</button></div>
+          <div class="modal-foot">
+            <button class="btn btn-secondary" data-close-modal>닫기</button>
+            ${currentUser().role === "admin" ? '<button class="btn btn-primary" id="editNoticeBtn">공고 수정</button>' : ''}
+          </div>
         `, true);
+        const editNoticeBtn = document.getElementById("editNoticeBtn");
+        if (editNoticeBtn) editNoticeBtn.addEventListener("click", () => openNoticeForm(n));
       }
   
-      function openNoticeForm() {
+      function openNoticeForm(notice = null) {
+        const editing = Boolean(notice);
         modal(`
-          <div class="modal-head"><h3>새 공고 등록</h3><button class="close-btn" data-close-modal>✕</button></div>
+          <div class="modal-head"><h3>${editing ? '공고 수정' : '새 공고 등록'}</h3><button class="close-btn" data-close-modal>✕</button></div>
           <form id="noticeForm">
             <div class="modal-body">
               <div class="field"><label>공고 분류</label><select class="control" id="noticeCategoryInput"><option>관리사무소</option><option>입주자대표회의</option><option>선거관리위원회</option><option>정부기관</option><option>기타</option></select></div>
-              <div class="field"><label>제목</label><input class="control" id="noticeTitleInput" required /></div>
-              <div class="field"><label>내용</label><textarea class="control" id="noticeBodyInput" required></textarea></div>
+              <div class="field"><label>제목</label><input class="control" id="noticeTitleInput" value="${editing ? escapeHtml(notice.title) : ''}" required /></div>
+              <div class="field"><label>내용</label><textarea class="control" id="noticeBodyInput" required>${editing ? escapeHtml(notice.body) : ''}</textarea></div>
               <div class="field">
                 <label>공고 이미지 <span class="muted">(선택, 최대 10MB)</span></label>
                 <label class="upload-box" for="noticeImageInput">
-                  <div style="font-size:28px;">▧</div><strong>이미지 선택</strong>
+                  <div style="font-size:28px;">▧</div><strong>${editing && notice.image ? '이미지 교체' : '이미지 선택'}</strong>
                   <div class="muted" style="font-size:12px;">JPG, PNG 등 이미지 파일</div>
                   <input type="file" id="noticeImageInput" accept="image/*" hidden />
                 </label>
-                <div class="upload-preview notice-upload-preview" id="noticeUploadPreview"><img id="noticeUploadPreviewImg" alt="공고 이미지 미리보기" /></div>
+                <div class="upload-preview notice-upload-preview" id="noticeUploadPreview"${editing && notice.image ? ' style="display:block;"' : ''}><img id="noticeUploadPreviewImg" src="${editing && notice.image ? escapeHtml(notice.image) : ''}" alt="공고 이미지 미리보기" /></div>
+                ${editing && notice.imagePath ? '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;"><input type="checkbox" id="noticeImageRemoveInput" /> 기존 이미지 삭제</label>' : ''}
               </div>
-              <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="noticePinnedInput" /> 중요 공고로 표시</label>
+              <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="noticePinnedInput"${editing && notice.pinned ? ' checked' : ''} /> 중요 공고로 표시</label>
             </div>
-            <div class="modal-foot"><button class="btn btn-secondary" type="button" data-close-modal>취소</button><button class="btn btn-primary" type="submit">공고 등록</button></div>
+            <div class="modal-foot"><button class="btn btn-secondary" type="button" data-close-modal>취소</button><button class="btn btn-primary" type="submit">${editing ? '수정 저장' : '공고 등록'}</button></div>
           </form>
         `);
+        if (editing) document.getElementById("noticeCategoryInput").value = notice.category;
         let noticeImageFile = null;
         document.getElementById("noticeImageInput").addEventListener("change", event => {
           const file = event.target.files[0];
@@ -1535,6 +1543,8 @@ export function mountApartmentPrototype(
             return toast("공고 이미지는 10MB 이하만 첨부할 수 있습니다.");
           }
           noticeImageFile = file;
+          const removeInput = document.getElementById("noticeImageRemoveInput");
+          if (removeInput) removeInput.checked = false;
           const reader = new FileReader();
           reader.onload = () => {
             document.getElementById("noticeUploadPreviewImg").src = reader.result;
@@ -1542,23 +1552,44 @@ export function mountApartmentPrototype(
           };
           reader.readAsDataURL(file);
         });
+        const noticeImageRemoveInput = document.getElementById("noticeImageRemoveInput");
+        if (noticeImageRemoveInput) noticeImageRemoveInput.addEventListener("change", event => {
+          if (event.target.checked) {
+            noticeImageFile = null;
+            document.getElementById("noticeImageInput").value = "";
+            document.getElementById("noticeUploadPreview").style.display = "none";
+          } else if (notice.image) {
+            document.getElementById("noticeUploadPreviewImg").src = notice.image;
+            document.getElementById("noticeUploadPreview").style.display = "block";
+          }
+        });
         document.getElementById("noticeForm").addEventListener("submit", async e => {
           e.preventDefault();
           const submitButton = e.submitter;
           submitButton.disabled = true;
           try {
-            await createNotice({
+            const noticeInput = {
               category: document.getElementById("noticeCategoryInput").value,
               title: document.getElementById("noticeTitleInput").value.trim(),
               body: document.getElementById("noticeBodyInput").value.trim(),
               pinned: document.getElementById("noticePinnedInput").checked,
               file: noticeImageFile || undefined,
-            });
+            };
+            if (editing) {
+              await updateNotice({
+                id: notice.id,
+                ...noticeInput,
+                existingImagePath: notice.imagePath || undefined,
+                removeImage: document.getElementById("noticeImageRemoveInput")?.checked || false,
+              });
+            } else {
+              await createNotice(noticeInput);
+            }
             await refreshState();
             closeModal();
-            toast("공고가 등록되었습니다.");
+            toast(editing ? "공고가 수정되었습니다." : "공고가 등록되었습니다.");
           } catch (error) {
-            handleError(error, "공고를 등록하지 못했습니다.");
+            handleError(error, editing ? "공고를 수정하지 못했습니다." : "공고를 등록하지 못했습니다.");
             submitButton.disabled = false;
           }
         });
