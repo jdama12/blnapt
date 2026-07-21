@@ -193,11 +193,17 @@ export async function fetchAppState() {
   ])
   for (const result of [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
 
-  const paths = (complaintsResult.data ?? []).map((row) => row.image_path).filter(Boolean)
-  const signedUrls = new Map<string, string>()
-  await Promise.all(paths.map(async (path) => {
+  const complaintPaths = (complaintsResult.data ?? []).map((row) => row.image_path).filter(Boolean)
+  const complaintSignedUrls = new Map<string, string>()
+  const noticePaths = (noticesResult.data ?? []).map((row) => row.image_path).filter(Boolean)
+  const noticeSignedUrls = new Map<string, string>()
+  await Promise.all(complaintPaths.map(async (path) => {
     const { data } = await client().storage.from('complaint-images').createSignedUrl(path, 3600)
-    if (data?.signedUrl) signedUrls.set(path, data.signedUrl)
+    if (data?.signedUrl) complaintSignedUrls.set(path, data.signedUrl)
+  }))
+  await Promise.all(noticePaths.map(async (path) => {
+    const { data } = await client().storage.from('notice-images').createSignedUrl(path, 3600)
+    if (data?.signedUrl) noticeSignedUrls.set(path, data.signedUrl)
   }))
 
   const users = (profilesResult.data ?? []).filter((row) => row.role !== 'admin').map((row) => ({
@@ -264,12 +270,20 @@ export async function fetchAppState() {
     return {
       id: row.id, authorId: row.author_id, title: row.title, category: row.category, location: row.location,
       content: row.content, status: row.status, priority: row.priority, createdAt: formatDateTime(row.created_at),
-      updatedAt: formatDateTime(row.updated_at), image: row.image_path ? signedUrls.get(row.image_path) ?? '' : '',
+      updatedAt: formatDateTime(row.updated_at), image: row.image_path ? complaintSignedUrls.get(row.image_path) ?? '' : '',
       comments: comments.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ id: item.id, userId: item.user_id, text: item.body, createdAt: formatDateTime(item.created_at) })),
       history: history.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ status: item.status, date: formatDateTime(item.created_at), note: item.note })),
     }
   })
-  const notices = (noticesResult.data ?? []).map((row) => ({ id: row.id, category: row.category, title: row.title, date: row.published_at, pinned: row.pinned, body: row.body }))
+  const notices = (noticesResult.data ?? []).map((row) => ({
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    date: row.published_at,
+    pinned: row.pinned,
+    body: row.body,
+    image: row.image_path ? noticeSignedUrls.get(row.image_path) ?? '' : '',
+  }))
   const mappedRecords = (recordsResult.data ?? []).map((row) => {
     const items = (row.monthly_items ?? []) as MonthlyItemRow[]
     return { kind: row.kind, month: row.month.slice(0, 7), total: Number(row.total), previous: Number(row.previous), items: items.sort((a, b) => a.sort_order - b.sort_order).map((item) => [item.name, Number(item.current_amount), Number(item.previous_amount)]) }
@@ -343,11 +357,28 @@ export async function updateComplaintStatus(id: number, status: string) {
   if (error) throw error
 }
 
-export async function createNotice(input: { category: string; title: string; body: string; pinned: boolean }) {
+export async function createNotice(input: { category: string; title: string; body: string; pinned: boolean; file?: File }) {
   const user = await getSessionUser()
   if (!user) throw new Error('로그인이 필요합니다.')
-  const { error } = await client().from('notices').insert({ ...input, author_id: user.id })
-  if (error) throw error
+  let imagePath: string | null = null
+  if (input.file) {
+    imagePath = `${user.id}/${crypto.randomUUID()}-${input.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { error: uploadError } = await client().storage.from('notice-images').upload(imagePath, input.file)
+    if (uploadError) throw uploadError
+  }
+
+  const { error } = await client().from('notices').insert({
+    category: input.category,
+    title: input.title,
+    body: input.body,
+    pinned: input.pinned,
+    author_id: user.id,
+    image_path: imagePath,
+  })
+  if (error) {
+    if (imagePath) await client().storage.from('notice-images').remove([imagePath])
+    throw error
+  }
 }
 
 export async function updateProfile(input: { password?: string }) {

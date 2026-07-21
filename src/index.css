@@ -421,6 +421,10 @@
     }
     .upload-preview { margin-top: 12px; display: none; }
     .upload-preview img { max-height: 250px; margin: 0 auto; border-radius: 12px; }
+    .notice-upload-preview { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+    .notice-upload-preview img { display: block; width: 100%; height: auto; max-height: none; object-fit: contain; }
+    .notice-detail-image-wrap { width: 100%; margin-top: 20px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+    .notice-detail-image { display: block; width: 100%; max-width: 100%; height: auto; margin: 0 auto; object-fit: contain; }
 
     .segmented {
       display: inline-flex; padding: 4px; border-radius: 12px; background: #e9eef5; gap: 3px;

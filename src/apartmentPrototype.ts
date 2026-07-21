@@ -1494,10 +1494,10 @@ export function mountApartmentPrototype(
           <div class="modal-body">
             ${n.pinned?'<span class="status-pill status-pending" style="margin-bottom:12px;">중요 공고</span>':""}
             <div style="white-space:pre-wrap;line-height:1.8;">${escapeHtml(n.body)}</div>
-            <div class="photo-box" style="margin-top:20px;min-height:230px;">첨부 공고문 또는 PDF 미리보기 영역</div>
+            ${n.image ? `<div class="notice-detail-image-wrap"><img class="notice-detail-image" src="${escapeHtml(n.image)}" alt="${escapeHtml(n.title)} 첨부 이미지" /></div>` : ""}
           </div>
           <div class="modal-foot"><button class="btn btn-secondary" data-close-modal>닫기</button></div>
-        `);
+        `, true);
       }
   
       function openNoticeForm() {
@@ -1508,25 +1508,58 @@ export function mountApartmentPrototype(
               <div class="field"><label>공고 분류</label><select class="control" id="noticeCategoryInput"><option>관리사무소</option><option>입주자대표회의</option><option>선거관리위원회</option><option>정부기관</option><option>기타</option></select></div>
               <div class="field"><label>제목</label><input class="control" id="noticeTitleInput" required /></div>
               <div class="field"><label>내용</label><textarea class="control" id="noticeBodyInput" required></textarea></div>
+              <div class="field">
+                <label>공고 이미지 <span class="muted">(선택, 최대 10MB)</span></label>
+                <label class="upload-box" for="noticeImageInput">
+                  <div style="font-size:28px;">▧</div><strong>이미지 선택</strong>
+                  <div class="muted" style="font-size:12px;">JPG, PNG 등 이미지 파일</div>
+                  <input type="file" id="noticeImageInput" accept="image/*" hidden />
+                </label>
+                <div class="upload-preview notice-upload-preview" id="noticeUploadPreview"><img id="noticeUploadPreviewImg" alt="공고 이미지 미리보기" /></div>
+              </div>
               <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="noticePinnedInput" /> 중요 공고로 표시</label>
             </div>
             <div class="modal-foot"><button class="btn btn-secondary" type="button" data-close-modal>취소</button><button class="btn btn-primary" type="submit">공고 등록</button></div>
           </form>
         `);
+        let noticeImageFile = null;
+        document.getElementById("noticeImageInput").addEventListener("change", event => {
+          const file = event.target.files[0];
+          if (!file) return;
+          if (!file.type.startsWith("image/")) {
+            event.target.value = "";
+            return toast("이미지 파일만 첨부할 수 있습니다.");
+          }
+          if (file.size > 10 * 1024 * 1024) {
+            event.target.value = "";
+            return toast("공고 이미지는 10MB 이하만 첨부할 수 있습니다.");
+          }
+          noticeImageFile = file;
+          const reader = new FileReader();
+          reader.onload = () => {
+            document.getElementById("noticeUploadPreviewImg").src = reader.result;
+            document.getElementById("noticeUploadPreview").style.display = "block";
+          };
+          reader.readAsDataURL(file);
+        });
         document.getElementById("noticeForm").addEventListener("submit", async e => {
           e.preventDefault();
+          const submitButton = e.submitter;
+          submitButton.disabled = true;
           try {
             await createNotice({
               category: document.getElementById("noticeCategoryInput").value,
               title: document.getElementById("noticeTitleInput").value.trim(),
               body: document.getElementById("noticeBodyInput").value.trim(),
               pinned: document.getElementById("noticePinnedInput").checked,
+              file: noticeImageFile || undefined,
             });
             await refreshState();
             closeModal();
             toast("공고가 등록되었습니다.");
           } catch (error) {
             handleError(error, "공고를 등록하지 못했습니다.");
+            submitButton.disabled = false;
           }
         });
       }
