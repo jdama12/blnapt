@@ -367,6 +367,7 @@
     .resident-custom-field { display: grid; grid-template-columns: minmax(130px,.55fr) minmax(180px,1fr) auto; gap: 10px; align-items: end; }
     .resident-unit-search { display: flex; flex: 0 0 auto; gap: 8px; align-items: center; }
     .resident-unit-search .control { width: 140px; min-height: 40px; }
+    .resident-status-filter { flex: 0 0 150px; width: 150px; min-height: 40px; }
     .photo-box {
       min-height: 180px; background: #f1f5f9; border-radius: 14px; display: grid; place-items: center;
       overflow: hidden; color: var(--muted);
@@ -565,6 +566,7 @@
       .resident-custom-field { grid-template-columns: 1fr; }
       .resident-list-toolbar { flex-direction: column; }
       .resident-building-tabs, .resident-unit-search { width: 100%; }
+      .resident-status-filter { width: 100%; flex-basis: auto; }
       .resident-unit-search .control { width: auto; flex: 1 1 auto; }
       .comment-form { flex-direction: column; }
       .admin-banner { align-items: flex-start; flex-direction: column; }

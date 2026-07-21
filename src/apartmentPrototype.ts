@@ -35,6 +35,7 @@ export function mountApartmentPrototype(
       let feeTab = "fee";
       let householdBuildingFilter = "all";
       let residentUnitSearch = "";
+      let residentStatusFilter = "all";
   
       const app = appRoot;
       const modalRoot = modalRootElement;
@@ -930,9 +931,12 @@ export function mountApartmentPrototype(
           ? state.households
           : state.households.filter(household => household.building === householdBuildingFilter);
         const unitQuery = residentUnitSearch.replace(/\D/g, "");
-        const visibleHouseholds = unitQuery
+        const unitFilteredHouseholds = unitQuery
           ? buildingHouseholds.filter(household => household.unit.includes(unitQuery))
           : buildingHouseholds;
+        const visibleHouseholds = residentStatusFilter === "active"
+          ? unitFilteredHouseholds.filter(household => household.currentResidentId)
+          : unitFilteredHouseholds;
         const occupiedCount = state.households.filter(household => household.currentResidentId).length;
         return `
           <div class="page-head">
@@ -947,6 +951,10 @@ export function mountApartmentPrototype(
                 </button>
               `).join("")}
             </div>
+            <select class="control resident-status-filter" id="residentStatusFilter" aria-label="가입상태 필터">
+              <option value="all" ${residentStatusFilter === "all" ? "selected" : ""}>가입상태 전체</option>
+              <option value="active" ${residentStatusFilter === "active" ? "selected" : ""}>가입완료</option>
+            </select>
             <form class="resident-unit-search" id="residentUnitSearchForm" role="search">
               <input class="control" id="residentUnitSearch" inputmode="numeric" maxlength="4" value="${escapeHtml(residentUnitSearch)}" placeholder="호수 검색" aria-label="호수 검색" />
               ${residentUnitSearch ? '<button class="btn btn-secondary btn-sm" type="button" id="clearResidentUnitSearch">초기화</button>' : ''}
@@ -954,7 +962,7 @@ export function mountApartmentPrototype(
             </form>
           </div>
           <section class="card">
-            <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>${unitQuery ? `${escapeHtml(unitQuery)}호 검색 결과` : "세대를 선택하면 가입상태와 상세 정보로 이동합니다."}</p></div><strong>${visibleHouseholds.length}세대</strong></div>
+            <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>${residentStatusFilter === "active" || unitQuery ? `${residentStatusFilter === "active" ? "가입완료" : ""}${residentStatusFilter === "active" && unitQuery ? " · " : ""}${unitQuery ? `${escapeHtml(unitQuery)}호` : ""} 검색 결과` : "세대를 선택하면 가입상태와 상세 정보로 이동합니다."}</p></div><strong>${visibleHouseholds.length}세대</strong></div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>동</th><th>호수</th><th>전화번호 뒷자리</th><th>전입일</th><th>가입상태</th></tr></thead>
@@ -1076,6 +1084,11 @@ export function mountApartmentPrototype(
         const clearResidentUnitSearch = document.getElementById("clearResidentUnitSearch");
         if (clearResidentUnitSearch) clearResidentUnitSearch.addEventListener("click", () => {
           residentUnitSearch = "";
+          render();
+        });
+        const residentStatusFilterSelect = document.getElementById("residentStatusFilter");
+        if (residentStatusFilterSelect) residentStatusFilterSelect.addEventListener("change", event => {
+          residentStatusFilter = event.target.value;
           render();
         });
         document.querySelectorAll("[data-household-id]").forEach(row => {
