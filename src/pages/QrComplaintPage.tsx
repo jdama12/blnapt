@@ -1,9 +1,9 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { createComplaint, resolveHouseholdQr, signInWithQr } from '../lib/backend'
+import { createComplaint, createGuestQrComplaint, resolveHouseholdQr, signInWithQr } from '../lib/backend'
 
-type HouseholdInfo = { building: number; unit: number }
-type QrSession = HouseholdInfo & { residentId: string; householdId: number }
+type HouseholdInfo = { building: number; unit: number; registered: boolean }
+type QrSession = { building: number; unit: number; residentId: string; householdId: number }
 
 const categories = ['시설', '전기', '청소', '주차', '경비', '조경', '소음', '기타']
 
@@ -46,21 +46,21 @@ export default function QrComplaintPage() {
 
   async function handleComplaint(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!session) return
+    if (!household) return
     setSubmitting(true)
     setError('')
     const form = new FormData(event.currentTarget)
     try {
-      const id = await createComplaint({
-        authorId: session.residentId,
+      const complaintInput = {
         category: String(form.get('category') ?? ''),
         title: String(form.get('title') ?? '').trim(),
         location: String(form.get('location') ?? '').trim(),
         content: String(form.get('content') ?? '').trim(),
-        status: 'pending',
-        source: 'qr',
         file: imageFile ?? undefined,
-      })
+      }
+      const id = session
+        ? await createComplaint({ ...complaintInput, authorId: session.residentId, status: 'pending', source: 'qr' })
+        : await createGuestQrComplaint(qrCode, complaintInput)
       setComplaintId(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '민원을 등록하지 못했습니다.')
@@ -89,7 +89,7 @@ export default function QrComplaintPage() {
 
         {!loading && !household && <div className="empty-state"><div className="empty-icon">!</div><strong>QR을 사용할 수 없습니다.</strong><p>{error || '관리사무소에서 새 QR을 발급받아 주세요.'}</p></div>}
 
-        {household && !session && (
+        {household?.registered && !session && (
           <>
             <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>세대 전용 QR</span></div>
             <h1>비밀번호를 입력하세요.</h1>
@@ -103,11 +103,11 @@ export default function QrComplaintPage() {
           </>
         )}
 
-        {session && complaintId === null && (
+        {household && (!household.registered || session) && complaintId === null && (
           <>
-            <div className="qr-household-badge"><strong>{session.building}동 {session.unit}호</strong><span>QR 민원접수</span></div>
+            <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>{session ? '입주민 QR 접수' : '미가입 세대 접수'}</span></div>
             <h1>민원 내용을 작성하세요.</h1>
-            <p className="lead">접수한 민원은 기존 민원 처리현황에서 동일하게 관리됩니다.</p>
+            <p className="lead">{session ? '접수한 민원은 기존 민원 처리현황에서 동일하게 관리됩니다.' : '민원은 바로 접수됩니다. 접수현황 확인과 추가 의견 작성은 회원가입 후 이용할 수 있습니다.'}</p>
             <form onSubmit={handleComplaint}>
               <div className="field"><label htmlFor="qrCategory">민원 분류</label><select className="control" id="qrCategory" name="category" required>{categories.map((category) => <option key={category}>{category}</option>)}</select></div>
               <div className="field"><label htmlFor="qrTitle">민원 제목</label><input className="control" id="qrTitle" name="title" maxLength={200} required /></div>
@@ -121,10 +121,12 @@ export default function QrComplaintPage() {
           </>
         )}
 
-        {session && complaintId !== null && (
+        {household && complaintId !== null && (
           <div className="qr-success">
             <div className="qr-success-icon">✓</div><h1>민원이 접수되었습니다.</h1><p>민원번호 <strong>#{complaintId}</strong></p>
-            <a className="btn btn-primary btn-block" href="/complaints">처리현황 확인</a>
+            {session
+              ? <a className="btn btn-primary btn-block" href="/complaints">처리현황 확인</a>
+              : <><div className="demo-box">현재는 민원 접수만 완료되었습니다. 처리현황을 확인하려면 입주민 회원가입과 관리자 승인이 필요합니다.</div><a className="btn btn-primary btn-block qr-normal-login" href="/register">회원가입</a></>}
           </div>
         )}
       </section>

@@ -17,7 +17,7 @@ export async function consumeRateLimit(
   admin: SupabaseClient,
   request: Request,
   secret: string,
-  attemptType: 'register' | 'login',
+  attemptType: 'register' | 'login' | 'qr-complaint',
   limit: number,
   windowMinutes: number,
 ) {
@@ -48,4 +48,3 @@ export async function consumeRateLimit(
 
   return true
 }
-

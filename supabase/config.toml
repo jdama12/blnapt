@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.resident-qr-login]
 verify_jwt = false
+
+[functions.resident-qr-complaint]
+verify_jwt = false

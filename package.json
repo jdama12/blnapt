@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "supabase:functions:deploy": "supabase functions deploy resident-register resident-login resident-qr-login --project-ref uiuywvpwuwrsyowhotvz --no-verify-jwt --use-api"
+    "supabase:functions:deploy": "supabase functions deploy resident-register resident-login resident-qr-login resident-qr-complaint --project-ref uiuywvpwuwrsyowhotvz --no-verify-jwt --use-api"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

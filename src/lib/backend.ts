@@ -68,7 +68,32 @@ export async function signIn(input: ResidentCredentials) {
 }
 
 export async function resolveHouseholdQr(qrCode: string) {
-  return invokeResidentFunction<{ building: number; unit: number }>('resident-qr-login', { action: 'resolve', qrCode })
+  return invokeResidentFunction<{ building: number; unit: number; registered: boolean }>('resident-qr-login', { action: 'resolve', qrCode })
+}
+
+export async function createGuestQrComplaint(qrCode: string, input: { category: string; title: string; location: string; content: string; file?: File }) {
+  const body = new FormData()
+  body.set('qrCode', qrCode)
+  body.set('category', input.category)
+  body.set('title', input.title)
+  body.set('location', input.location)
+  body.set('content', input.content)
+  if (input.file) body.set('image', input.file)
+  const { data, error } = await client().functions.invoke('resident-qr-complaint', { body })
+  if (error) {
+    let message = error.message
+    const context = (error as { context?: Response }).context
+    if (context) {
+      try {
+        const errorBody = await context.json() as { message?: string }
+        if (errorBody.message) message = errorBody.message
+      } catch {
+        // Keep the SDK error when the function did not return JSON.
+      }
+    }
+    throw new Error(message)
+  }
+  return (data as { id: number }).id
 }
 
 export async function signInWithQr(qrCode: string, password: string) {
@@ -293,7 +318,7 @@ export async function fetchAppState() {
     const history = (row.complaint_history ?? []) as HistoryRow[]
     return {
       id: row.id, authorId: row.author_id, title: row.title, category: row.category, location: row.location,
-      content: row.content, status: row.status, priority: row.priority, source: row.source ?? 'app', createdAt: formatDateTime(row.created_at),
+      householdId: row.household_id, content: row.content, status: row.status, priority: row.priority, source: row.source ?? 'app', createdAt: formatDateTime(row.created_at),
       updatedAt: formatDateTime(row.updated_at), image: row.image_path ? complaintSignedUrls.get(row.image_path) ?? '' : '',
       comments: comments.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ id: item.id, userId: item.user_id, text: item.body, createdAt: formatDateTime(item.created_at) })),
       history: history.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ status: item.status, date: formatDateTime(item.created_at), note: item.note })),

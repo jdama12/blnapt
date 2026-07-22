@@ -27,7 +27,7 @@ export function mountApartmentPrototype(
       let loadError = "";
       let disposed = false;
       let currentRoute = initialRoute;
-      let authTab = "login";
+      let authTab = window.location.pathname === "/register" ? "register" : "login";
       let complaintFilter = "current";
       let complaintSearch = "";
       let complaintStatusFilter = "all";
@@ -45,6 +45,11 @@ export function mountApartmentPrototype(
       }
       function userById(id) {
         return state.users.find(u => u.id === id) || { name: "알 수 없음", building: "-", unit: "-", role: "resident" };
+      }
+      function complaintAuthor(complaint) {
+        if (complaint.authorId) return userById(complaint.authorId);
+        const targetHousehold = state.households.find(item => String(item.id) === String(complaint.householdId));
+        return { name: "미가입 세대", building: targetHousehold?.building || "-", unit: targetHousehold?.unit || "-", role: "guest" };
       }
       function fmtNumber(n) {
         return Number(n).toLocaleString("ko-KR");
@@ -711,7 +716,7 @@ export function mountApartmentPrototype(
                 <thead><tr><th>번호</th><th>분류</th><th>민원 제목</th>${user.role==="admin"?"<th>신청자</th>":""}<th>위치</th><th>상태</th><th>등록일</th></tr></thead>
                 <tbody>
                   ${rows.length ? rows.map(c => {
-                    const author = userById(c.authorId);
+                    const author = complaintAuthor(c);
                     return `<tr data-complaint-id="${c.id}">
                       <td>#${c.id}</td><td><span class="category-pill">${escapeHtml(c.category)}</span>${c.source === "qr" ? '<span class="status-pill status-received" style="margin-left:6px;">QR</span>' : ''}</td>
                       <td><strong>${escapeHtml(c.title)}</strong></td>
@@ -726,7 +731,7 @@ export function mountApartmentPrototype(
   
           <div class="mobile-card-list">
             ${rows.length ? rows.map(c => {
-              const author = userById(c.authorId);
+              const author = complaintAuthor(c);
               return `<article class="mobile-record" data-complaint-id="${c.id}">
                 <div class="row"><strong>${escapeHtml(c.title)}</strong>${statusBadge(c.status)}</div>
                 <div class="row"><span class="muted">${escapeHtml(c.category)} · ${escapeHtml(c.location)}</span></div>
@@ -1430,7 +1435,7 @@ export function mountApartmentPrototype(
         const c = state.complaints.find(x=>x.id===id);
         if (!c) return;
         const user = currentUser();
-        const author = userById(c.authorId);
+        const author = complaintAuthor(c);
         const canManage = user.role === "admin";
         const statusOptions = Object.entries(STATUS).map(([key,s])=>`<option value="${key}" ${c.status===key?"selected":""}>${s.label}</option>`).join("");
         modal(`

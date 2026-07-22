@@ -39,7 +39,7 @@ Deno.serve(async (request) => {
     if (!household) return jsonResponse({ message: '세대 정보를 찾을 수 없습니다.' }, 404)
 
     if (action === 'resolve') {
-      return jsonResponse({ building: household.building, unit: household.unit })
+      return jsonResponse({ building: household.building, unit: household.unit, registered: Boolean(household.current_resident_id) })
     }
     if (action !== 'login') return jsonResponse({ message: '허용되지 않은 요청입니다.' }, 400)
 
@@ -80,4 +80,3 @@ Deno.serve(async (request) => {
     return jsonResponse({ message: 'QR 로그인을 처리하지 못했습니다.' }, 500)
   }
 })
-

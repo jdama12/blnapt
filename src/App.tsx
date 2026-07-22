@@ -18,6 +18,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<LoginPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
