@@ -19,6 +19,8 @@ export default function QrComplaintPage() {
   const [complaintId, setComplaintId] = useState<number | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const previewUrl = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : '', [imageFile])
+  const showSubHeader = Boolean(household && (view !== 'menu' || complaintId !== null))
+  const subHeaderTitle = view === 'notices' ? (selectedNotice ? '공고 상세' : '공고 보기') : '민원 접수'
 
   useEffect(() => {
     let active = true
@@ -85,13 +87,31 @@ export default function QrComplaintPage() {
     setImageFile(file)
   }
 
+  function handleSubBack() {
+    setError('')
+    if (view === 'notices' && selectedNotice) {
+      setSelectedNotice(null)
+      return
+    }
+    setComplaintId(null)
+    setView('menu')
+  }
+
   return (
-    <main className="qr-page">
+    <main className={`qr-page${showSubHeader ? ' has-sub-header' : ''}`}>
+      {showSubHeader && (
+        <header className="qr-sub-header">
+          <div className="qr-sub-header-inner">
+            <button type="button" onClick={handleSubBack} aria-label="이전 화면으로 돌아가기">‹</button>
+            <strong>{subHeaderTitle}</strong>
+          </div>
+        </header>
+      )}
       <section className="qr-flow-card">
-        <div className="brand-lockup qr-brand">
+        {!showSubHeader && <div className="brand-lockup qr-brand">
           <div className="brand-mark">APT</div>
           <div><div className="brand-title">보라매롯데낙천대</div><div className="brand-sub">QR 간편 민원접수</div></div>
-        </div>
+        </div>}
 
         {loading && <div className="loading-state qr-loading"><div className="spinner" /><b>세대 QR을 확인하고 있습니다.</b></div>}
 
@@ -128,7 +148,6 @@ export default function QrComplaintPage() {
               {error && <div className="qr-error" role="alert">{error}</div>}
               <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>{submitting ? '접수 중…' : '민원 접수'}</button>
             </form>
-            <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => setView('menu')}>메뉴로 돌아가기</button>
           </>
         )}
 
@@ -137,7 +156,6 @@ export default function QrComplaintPage() {
             <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>아파트 공고</span></div>
             {selectedNotice ? (
               <article className="qr-notice-detail">
-                <button className="qr-back-link" type="button" onClick={() => setSelectedNotice(null)}>‹ 공고 목록</button>
                 <div className="qr-notice-meta"><span>{selectedNotice.category}</span><time>{selectedNotice.date}</time></div>
                 <h1>{selectedNotice.title}</h1>
                 {selectedNotice.image && <img src={selectedNotice.image} alt={`${selectedNotice.title} 공고 이미지`} />}
@@ -155,7 +173,6 @@ export default function QrComplaintPage() {
                     </button>
                   )) : <div className="empty-state"><strong>등록된 공고가 없습니다.</strong></div>}
                 </div>
-                <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => setView('menu')}>메뉴로 돌아가기</button>
               </>
             )}
           </>
@@ -166,7 +183,6 @@ export default function QrComplaintPage() {
             <div className="qr-success-icon">✓</div><h1>민원이 접수되었습니다.</h1><p>민원번호 <strong>#{complaintId}</strong></p>
             <div className="demo-box">접수현황을 확인하려면 입주민 로그인이 필요합니다. 미가입 세대는 회원가입과 관리자 승인 후 확인할 수 있습니다.</div>
             <a className="btn btn-primary btn-block qr-normal-login" href={household.registered ? '/login' : '/register'}>{household.registered ? '입주민 로그인' : '회원가입'}</a>
-            <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => { setComplaintId(null); setView('menu') }}>메뉴로 돌아가기</button>
           </div>
         )}
       </section>
