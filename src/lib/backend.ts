@@ -239,7 +239,7 @@ export async function fetchAppState() {
     ? client().from('registration_requests').select('*').eq('status', 'pending').order('created_at')
     : Promise.resolve({ data: [], error: null })
   const householdsPromise = isAdminAccount
-    ? client().from('households').select('*').order('building').order('unit')
+    ? client().from('households').select('*, household_residency_history(*)').order('building').order('unit')
     : Promise.resolve({ data: [], error: null })
   const residentCardsPromise = isAdminAccount
     ? client().from('resident_cards').select('*, resident_card_fields(*)')
@@ -318,6 +318,18 @@ export async function fetchAppState() {
     area: Number(row.area_sqm),
     currentResidentId: row.current_resident_id,
     qrCode: householdQrCodes.get(row.id) ?? '',
+    history: (row.household_residency_history ?? [])
+      .sort((a: { created_at: string; id: number }, b: { created_at: string; id: number }) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
+      .map((item: { id: number; event_type: string; previous_resident_id: string | null; resident_id: string | null; previous_move_in_date: string | null; move_in_date: string | null; changed_by: string | null; created_at: string }) => ({
+        id: item.id,
+        eventType: item.event_type,
+        previousResidentId: item.previous_resident_id,
+        residentId: item.resident_id,
+        previousMoveInDate: item.previous_move_in_date ?? '',
+        moveInDate: item.move_in_date ?? '',
+        changedBy: item.changed_by,
+        date: formatDateTime(item.created_at),
+      })),
   }))
   const residentCards = (residentCardsResult.data ?? []).map((row) => ({
     residentId: row.resident_id,

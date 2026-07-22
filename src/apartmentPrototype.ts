@@ -1046,6 +1046,7 @@ export function mountApartmentPrototype(
         const statusKey = resident ? "active" : pendingRequest ? "pending" : "unregistered";
         const statusLabel = resident ? "가입완료" : pendingRequest ? "승인대기" : "미가입";
         const statusClass = resident ? "status-complete" : pendingRequest ? "status-pending" : "";
+        const residencyHistory = household.history ?? [];
         return `
           <div class="resident-breadcrumb"><button class="link-button" data-route="adminResidents">입주민 현황</button><span>/</span><span>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</span><span>/</span><strong>상세</strong></div>
           <div class="page-head"><div><h2>입주민 카드</h2><p>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호의 관리 정보를 확인하고 수정합니다.</p></div><div class="page-head-actions"><button class="btn btn-outline" type="button" data-qr-household="${household.id}">세대 QR</button><button class="btn btn-secondary" data-route="adminResidents">목록으로</button></div></div>
@@ -1062,7 +1063,20 @@ export function mountApartmentPrototype(
               </div>
             </section>
             <aside class="card resident-card-summary">
-              <div class="card-body"><div class="resident-avatar">${escapeHtml(household.building)}</div><strong>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</strong><span class="muted">${resident ? escapeHtml(resident.name) : pendingRequest ? "가입 승인 대기" : "등록된 입주민 없음"}</span><span class="muted">최근 수정 ${card?.updatedAt ? escapeHtml(card.updatedAt) : "없음"}</span></div>
+              <div class="card-body">
+                <div class="resident-summary-heading"><strong>세대 QR</strong><span>현재 발급된 QR 코드</span></div>
+                <button class="resident-detail-qr" type="button" data-qr-household="${household.id}" aria-label="${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호 QR 크게 보기">
+                  <div class="spinner" id="residentDetailQrSpinner"></div>
+                  <img id="residentDetailQrImage" alt="${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호 QR 코드" hidden />
+                </button>
+                <strong>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</strong>
+                <span class="muted">${resident ? escapeHtml(resident.name) : pendingRequest ? "가입 승인 대기" : "등록된 입주민 없음"}</span>
+                <div class="resident-summary-actions">
+                  <a class="btn btn-secondary btn-sm" id="residentDetailQrDownload" download="${escapeHtml(household.building)}동-${escapeHtml(household.unit)}호-QR.png">QR 다운로드</a>
+                  <button class="btn btn-outline btn-sm" type="button" id="residentHistoryBtn">변경 이력 ${residencyHistory.length}</button>
+                </div>
+                <span class="muted">최근 변경 ${residencyHistory[0]?.date ? escapeHtml(residencyHistory[0].date) : card?.updatedAt ? escapeHtml(card.updatedAt) : "없음"}</span>
+              </div>
             </aside>
           </div>
           <section class="card" style="margin-top:18px;">
@@ -1104,6 +1118,49 @@ export function mountApartmentPrototype(
         return `${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7)}`;
       }
 
+      function residentHistoryName(residentId) {
+        if (!residentId) return "없음";
+        const user = state.users.find(item => item.id === residentId);
+        return user ? `${user.name} (${user.phoneLast4 || "연락처 없음"})` : "이전 입주민";
+      }
+
+      function openResidentHistory(targetHousehold) {
+        const history = targetHousehold.history ?? [];
+        const eventLabel = { move_in: "입주민 등록", resident_change: "입주민 변경", move_out: "이용 종료", move_in_date: "전입일 변경" };
+        modal(`
+          <div class="modal-head"><div><h3>${escapeHtml(targetHousehold.building)}동 ${escapeHtml(targetHousehold.unit)}호 변경 이력</h3><div class="muted" style="font-size:12px;">입주민과 전입일 변경 시 세대 QR이 자동 재발급됩니다.</div></div><button class="close-btn" data-close-modal>✕</button></div>
+          <div class="modal-body">
+            <div class="resident-history-list">
+              ${history.length ? history.map(item => `
+                <article class="resident-history-item">
+                  <div><span class="status-pill">${escapeHtml(eventLabel[item.eventType] || "정보 변경")}</span><time>${escapeHtml(item.date)}</time></div>
+                  ${item.eventType === "move_in_date"
+                    ? `<strong>전입일 ${escapeHtml(item.previousMoveInDate || "미입력")} → ${escapeHtml(item.moveInDate || "미입력")}</strong>`
+                    : `<strong>${escapeHtml(residentHistoryName(item.previousResidentId))} → ${escapeHtml(residentHistoryName(item.residentId))}</strong><small>전입일 ${escapeHtml(item.previousMoveInDate || "미입력")} → ${escapeHtml(item.moveInDate || "미입력")}</small>`}
+                </article>
+              `).join("") : renderEmpty("기록된 입주 변경 이력이 없습니다.")}
+            </div>
+          </div>
+          <div class="modal-foot"><button class="btn btn-secondary" data-close-modal>닫기</button></div>
+        `);
+      }
+
+      async function renderResidentDetailQr(targetHousehold) {
+        const image = document.getElementById("residentDetailQrImage");
+        if (!image || !targetHousehold?.qrCode) return;
+        try {
+          const qrUrl = `${window.location.origin}/q/${targetHousehold.qrCode}`;
+          const { default: QRCode } = await import("qrcode");
+          const dataUrl = await QRCode.toDataURL(qrUrl, { width: 360, margin: 2, errorCorrectionLevel: "M" });
+          image.src = dataUrl;
+          image.hidden = false;
+          document.getElementById("residentDetailQrSpinner")?.remove();
+          document.getElementById("residentDetailQrDownload").href = dataUrl;
+        } catch (error) {
+          handleError(error, "QR 이미지를 생성하지 못했습니다.");
+        }
+      }
+
       async function openHouseholdQr(targetHouseholdId) {
         const target = state.households.find(item => String(item.id) === String(targetHouseholdId));
         if (!target?.qrCode) return toast("세대 QR 정보를 찾을 수 없습니다.");
@@ -1114,7 +1171,7 @@ export function mountApartmentPrototype(
             <div class="spinner" id="qrAdminSpinner"></div>
             <img id="qrAdminImage" alt="${escapeHtml(target.building)}동 ${escapeHtml(target.unit)}호 QR 코드" hidden />
             <div class="qr-admin-address">${escapeHtml(qrUrl)}</div>
-            <div class="demo-box">QR만으로 로그인할 수 없으며 현재 입주민의 비밀번호가 필요합니다. QR이 외부에 노출되면 재발급하세요.</div>
+            <div class="demo-box">세대 QR로 민원접수와 공고 열람이 가능합니다. QR이 외부에 노출되었거나 입주 정보가 변경되면 재발급된 최신 QR을 사용하세요.</div>
           </div>
           <div class="modal-foot"><button class="btn btn-secondary" data-close-modal>닫기</button><button class="btn btn-danger" id="rotateHouseholdQrBtn">QR 재발급</button><a class="btn btn-primary" id="downloadHouseholdQr" download="${escapeHtml(target.building)}동-${escapeHtml(target.unit)}호-QR.png">QR 다운로드</a></div>
         `);
@@ -1217,14 +1274,20 @@ export function mountApartmentPrototype(
         });
         const detailHousehold = state.households.find(item => String(item.id) === String(householdId));
         const detailResidentId = detailHousehold?.currentResidentId;
+        const detailResidentCard = detailResidentId ? state.residentCards.find(item => item.residentId === detailResidentId) : null;
+        if (detailHousehold) {
+          void renderResidentDetailQr(detailHousehold);
+          document.getElementById("residentHistoryBtn")?.addEventListener("click", () => openResidentHistory(detailHousehold));
+        }
         const residentCardForm = document.getElementById("residentCardForm");
         if (residentCardForm) residentCardForm.addEventListener("submit", async event => {
           event.preventDefault();
           const submitButton = event.submitter;
           submitButton.disabled = true;
           try {
+            const nextMoveInDate = document.getElementById("residentMoveInDate").value || null;
             await saveResidentCard(detailResidentId, {
-              moveInDate: document.getElementById("residentMoveInDate").value || null,
+              moveInDate: nextMoveInDate,
               memo: document.getElementById("residentMemo").value.trim(),
             });
             const fields = [...document.querySelectorAll("[data-card-field]")];
@@ -1234,7 +1297,7 @@ export function mountApartmentPrototype(
               field.querySelector("[data-field-value]").value.trim(),
             )));
             await refreshState();
-            toast("입주민 카드를 저장했습니다.");
+            toast((detailResidentCard?.moveInDate || null) !== nextMoveInDate ? "전입일을 변경하고 세대 QR을 새로 발급했습니다." : "입주민 카드를 저장했습니다.");
           } catch (error) {
             handleError(error, "입주민 카드를 저장하지 못했습니다.");
             submitButton.disabled = false;
