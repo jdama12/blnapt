@@ -41,6 +41,32 @@ Deno.serve(async (request) => {
     if (action === 'resolve') {
       return jsonResponse({ building: household.building, unit: household.unit, registered: Boolean(household.current_resident_id) })
     }
+    if (action === 'notices') {
+      const { data: notices, error: noticesError } = await admin
+        .from('notices')
+        .select('id, category, title, body, pinned, published_at, image_path')
+        .order('pinned', { ascending: false })
+        .order('published_at', { ascending: false })
+      if (noticesError) throw noticesError
+
+      const rows = await Promise.all((notices ?? []).map(async (notice) => {
+        let image = ''
+        if (notice.image_path) {
+          const { data } = await admin.storage.from('notice-images').createSignedUrl(notice.image_path, 3600)
+          image = data?.signedUrl ?? ''
+        }
+        return {
+          id: notice.id,
+          category: notice.category,
+          title: notice.title,
+          body: notice.body,
+          pinned: notice.pinned,
+          date: notice.published_at,
+          image,
+        }
+      }))
+      return jsonResponse({ notices: rows })
+    }
     if (action !== 'login') return jsonResponse({ message: '허용되지 않은 요청입니다.' }, 400)
 
     const withinLimit = await consumeRateLimit(admin, request, serviceRoleKey, 'login', 30, 10)

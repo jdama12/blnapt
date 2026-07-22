@@ -40,7 +40,6 @@ Deno.serve(async (request) => {
     const { data: household, error: householdError } = await admin.from('households').select('id, current_resident_id').eq('id', qr.household_id).maybeSingle()
     if (householdError) throw householdError
     if (!household) return jsonResponse({ message: '세대 정보를 찾을 수 없습니다.' }, 404)
-    if (household.current_resident_id) return jsonResponse({ message: '가입된 세대입니다. 비밀번호로 로그인해 주세요.' }, 409)
 
     const image = form.get('image')
     if (image instanceof File && image.size > 0) {
@@ -56,7 +55,7 @@ Deno.serve(async (request) => {
 
     failureStage = '민원 저장'
     const { data: complaint, error: insertError } = await admin.from('complaints').insert({
-      author_id: null,
+      author_id: household.current_resident_id,
       household_id: household.id,
       category,
       title,

@@ -1,16 +1,18 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { clearSessionForQr, createComplaint, createGuestQrComplaint, resolveHouseholdQr, signInWithQr } from '../lib/backend'
+import { clearSessionForQr, createGuestQrComplaint, getQrNotices, resolveHouseholdQr, type QrNotice } from '../lib/backend'
 
 type HouseholdInfo = { building: number; unit: number; registered: boolean }
-type QrSession = { building: number; unit: number; residentId: string; householdId: number }
+type QrView = 'menu' | 'complaint' | 'notices'
 
 const categories = ['시설', '전기', '청소', '주차', '경비', '조경', '소음', '기타']
 
 export default function QrComplaintPage() {
   const { qrCode = '' } = useParams()
   const [household, setHousehold] = useState<HouseholdInfo | null>(null)
-  const [session, setSession] = useState<QrSession | null>(null)
+  const [view, setView] = useState<QrView>('menu')
+  const [notices, setNotices] = useState<QrNotice[]>([])
+  const [selectedNotice, setSelectedNotice] = useState<QrNotice | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -37,16 +39,16 @@ export default function QrComplaintPage() {
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function openNotices() {
     setSubmitting(true)
     setError('')
-    const form = new FormData(event.currentTarget)
     try {
-      const result = await signInWithQr(qrCode, String(form.get('password') ?? ''))
-      setSession(result)
+      const result = await getQrNotices(qrCode)
+      setNotices(result)
+      setSelectedNotice(null)
+      setView('notices')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'QR 로그인을 처리하지 못했습니다.')
+      setError(cause instanceof Error ? cause.message : '공고를 불러오지 못했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -66,9 +68,7 @@ export default function QrComplaintPage() {
         content: String(form.get('content') ?? '').trim(),
         file: imageFile ?? undefined,
       }
-      const id = session
-        ? await createComplaint({ ...complaintInput, authorId: session.residentId, status: 'pending', source: 'qr' })
-        : await createGuestQrComplaint(qrCode, complaintInput)
+      const id = await createGuestQrComplaint(qrCode, complaintInput)
       setComplaintId(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '민원을 등록하지 못했습니다.')
@@ -97,25 +97,27 @@ export default function QrComplaintPage() {
 
         {!loading && !household && <div className="empty-state"><div className="empty-icon">!</div><strong>QR을 사용할 수 없습니다.</strong><p>{error || '관리사무소에서 새 QR을 발급받아 주세요.'}</p></div>}
 
-        {household?.registered && !session && (
+        {household && view === 'menu' && complaintId === null && (
           <>
             <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>세대 전용 QR</span></div>
-            <h1>비밀번호를 입력하세요.</h1>
-            <p className="lead">승인된 현재 입주민의 비밀번호로 민원접수 화면에 접속합니다.</p>
-            <form onSubmit={handleLogin}>
-              <div className="field"><label htmlFor="qrPassword">비밀번호</label><input className="control" id="qrPassword" name="password" type="password" autoComplete="current-password" minLength={8} maxLength={72} required autoFocus /></div>
-              {error && <div className="qr-error" role="alert">{error}</div>}
-              <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>{submitting ? '확인 중…' : '민원접수 시작'}</button>
-            </form>
-            <a className="btn btn-secondary btn-block qr-normal-login" href="/login">일반 로그인으로 이동</a>
+            <h1>이용할 메뉴를 선택하세요.</h1>
+            <p className="lead">세대 QR로 필요한 아파트 서비스를 빠르게 이용할 수 있습니다.</p>
+            <div className="qr-service-menu">
+              <button className="qr-service-item" type="button" onClick={() => { setError(''); setView('complaint') }}><span className="qr-service-icon">!</span><span><strong>민원접수</strong><small>불편사항을 바로 접수합니다.</small></span><b>›</b></button>
+              <button className="qr-service-item" type="button" onClick={openNotices} disabled={submitting}><span className="qr-service-icon">▣</span><span><strong>공고 보기</strong><small>관리소와 단지의 공고를 확인합니다.</small></span><b>›</b></button>
+              <button className="qr-service-item is-preparing" type="button" disabled><span className="qr-service-icon">₩</span><span><strong>관리비 보기</strong><small>현재 서비스 준비중입니다.</small></span><em>준비중</em></button>
+              <button className="qr-service-item is-preparing" type="button" disabled><span className="qr-service-icon">i</span><span><strong>아파트 생활 가이드</strong><small>새로운 생활 안내를 준비하고 있습니다.</small></span><em>준비중</em></button>
+            </div>
+            {error && <div className="qr-error" role="alert">{error}</div>}
+            <a className="btn btn-secondary btn-block qr-normal-login" href="/login">입주민 로그인</a>
           </>
         )}
 
-        {household && (!household.registered || session) && complaintId === null && (
+        {household && view === 'complaint' && complaintId === null && (
           <>
-            <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>{session ? '입주민 QR 접수' : '미가입 세대 접수'}</span></div>
+            <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>QR 간편접수</span></div>
             <h1>민원 내용을 작성하세요.</h1>
-            <p className="lead">{session ? '접수한 민원은 기존 민원 처리현황에서 동일하게 관리됩니다.' : '민원은 바로 접수됩니다. 접수현황 확인과 추가 의견 작성은 회원가입 후 이용할 수 있습니다.'}</p>
+            <p className="lead">가입 여부와 관계없이 바로 접수됩니다. 처리현황 확인과 추가 의견 작성은 입주민 로그인 후 이용할 수 있습니다.</p>
             <form onSubmit={handleComplaint}>
               <div className="field"><label htmlFor="qrCategory">민원 분류</label><select className="control" id="qrCategory" name="category" required>{categories.map((category) => <option key={category}>{category}</option>)}</select></div>
               <div className="field"><label htmlFor="qrTitle">민원 제목</label><input className="control" id="qrTitle" name="title" maxLength={200} required /></div>
@@ -126,15 +128,45 @@ export default function QrComplaintPage() {
               {error && <div className="qr-error" role="alert">{error}</div>}
               <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>{submitting ? '접수 중…' : '민원 접수'}</button>
             </form>
+            <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => setView('menu')}>메뉴로 돌아가기</button>
+          </>
+        )}
+
+        {household && view === 'notices' && complaintId === null && (
+          <>
+            <div className="qr-household-badge"><strong>{household.building}동 {household.unit}호</strong><span>아파트 공고</span></div>
+            {selectedNotice ? (
+              <article className="qr-notice-detail">
+                <button className="qr-back-link" type="button" onClick={() => setSelectedNotice(null)}>‹ 공고 목록</button>
+                <div className="qr-notice-meta"><span>{selectedNotice.category}</span><time>{selectedNotice.date}</time></div>
+                <h1>{selectedNotice.title}</h1>
+                {selectedNotice.image && <img src={selectedNotice.image} alt={`${selectedNotice.title} 공고 이미지`} />}
+                <p>{selectedNotice.body}</p>
+              </article>
+            ) : (
+              <>
+                <h1>아파트 공고</h1>
+                <p className="lead">관리소·입대의·선관위의 최신 소식입니다.</p>
+                <div className="qr-notice-list">
+                  {notices.length ? notices.map((notice) => (
+                    <button type="button" key={notice.id} onClick={() => setSelectedNotice(notice)}>
+                      <span><em>{notice.category}</em>{notice.pinned && <b>중요</b>}</span>
+                      <strong>{notice.title}</strong><time>{notice.date}</time>
+                    </button>
+                  )) : <div className="empty-state"><strong>등록된 공고가 없습니다.</strong></div>}
+                </div>
+                <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => setView('menu')}>메뉴로 돌아가기</button>
+              </>
+            )}
           </>
         )}
 
         {household && complaintId !== null && (
           <div className="qr-success">
             <div className="qr-success-icon">✓</div><h1>민원이 접수되었습니다.</h1><p>민원번호 <strong>#{complaintId}</strong></p>
-            {session
-              ? <a className="btn btn-primary btn-block" href="/complaints">처리현황 확인</a>
-              : <><div className="demo-box">현재는 민원 접수만 완료되었습니다. 처리현황을 확인하려면 입주민 회원가입과 관리자 승인이 필요합니다.</div><a className="btn btn-primary btn-block qr-normal-login" href="/register">회원가입</a></>}
+            <div className="demo-box">접수현황을 확인하려면 입주민 로그인이 필요합니다. 미가입 세대는 회원가입과 관리자 승인 후 확인할 수 있습니다.</div>
+            <a className="btn btn-primary btn-block qr-normal-login" href={household.registered ? '/login' : '/register'}>{household.registered ? '입주민 로그인' : '회원가입'}</a>
+            <button className="btn btn-secondary btn-block qr-normal-login" type="button" onClick={() => { setComplaintId(null); setView('menu') }}>메뉴로 돌아가기</button>
           </div>
         )}
       </section>

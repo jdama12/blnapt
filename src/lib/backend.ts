@@ -71,6 +71,21 @@ export async function resolveHouseholdQr(qrCode: string) {
   return invokeResidentFunction<{ building: number; unit: number; registered: boolean }>('resident-qr-login', { action: 'resolve', qrCode })
 }
 
+export type QrNotice = {
+  id: number
+  category: string
+  title: string
+  body: string
+  pinned: boolean
+  date: string
+  image: string
+}
+
+export async function getQrNotices(qrCode: string) {
+  const result = await invokeResidentFunction<{ notices: QrNotice[] }>('resident-qr-login', { action: 'notices', qrCode })
+  return result.notices
+}
+
 export async function createGuestQrComplaint(qrCode: string, input: { category: string; title: string; location: string; content: string; file?: File }) {
   const body = new FormData()
   body.set('qrCode', qrCode)
