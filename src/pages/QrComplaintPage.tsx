@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { createComplaint, createGuestQrComplaint, resolveHouseholdQr, signInWithQr } from '../lib/backend'
+import { clearSessionForQr, createComplaint, createGuestQrComplaint, resolveHouseholdQr, signInWithQr } from '../lib/backend'
 
 type HouseholdInfo = { building: number; unit: number; registered: boolean }
 type QrSession = { building: number; unit: number; residentId: string; householdId: number }
@@ -20,10 +20,18 @@ export default function QrComplaintPage() {
 
   useEffect(() => {
     let active = true
-    resolveHouseholdQr(qrCode)
-      .then((result) => { if (active) setHousehold(result) })
-      .catch((cause: Error) => { if (active) setError(cause.message) })
-      .finally(() => { if (active) setLoading(false) })
+    const prepareQrSession = async () => {
+      try {
+        await clearSessionForQr()
+        const result = await resolveHouseholdQr(qrCode)
+        if (active) setHousehold(result)
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'QR 접속을 준비하지 못했습니다.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    void prepareQrSession()
     return () => { active = false }
   }, [qrCode])
 

@@ -187,6 +187,11 @@ export async function signOut() {
   if (error) throw error
 }
 
+export async function clearSessionForQr() {
+  const { error } = await client().auth.signOut({ scope: 'local' })
+  if (error) throw error
+}
+
 export async function fetchAppState() {
   const user = await getSessionUser()
   if (!user) return { currentUserId: null, users: [], households: [], registrationRequests: [], residentCards: [], complaints: [], notices: [], fees: [], income: [] }
