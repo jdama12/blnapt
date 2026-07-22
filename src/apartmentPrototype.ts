@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { AppRoute } from './routes'
-import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deactivateResident, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateNotice, updateProfile, updateResidentCardField } from './lib/backend'
+import { addComplaintComment, addResidentCardField, approveUser, createComplaint, createNotice, deactivateResident, deleteResidentCardField, fetchAppState, getSessionUser, rejectRegistration, requestAdminPasswordReset, rotateHouseholdQr, saveResidentCard, signIn, signInAdmin, signOut, signUp, updateAdminEmail, updateAdminPassword, updateComplaintStatus, updateNotice, updateProfile, updateResidentCardField } from './lib/backend'
 import { isSupabaseConfigured } from './lib/supabase'
 
 export function mountApartmentPrototype(
@@ -713,7 +713,7 @@ export function mountApartmentPrototype(
                   ${rows.length ? rows.map(c => {
                     const author = userById(c.authorId);
                     return `<tr data-complaint-id="${c.id}">
-                      <td>#${c.id}</td><td><span class="category-pill">${escapeHtml(c.category)}</span></td>
+                      <td>#${c.id}</td><td><span class="category-pill">${escapeHtml(c.category)}</span>${c.source === "qr" ? '<span class="status-pill status-received" style="margin-left:6px;">QR</span>' : ''}</td>
                       <td><strong>${escapeHtml(c.title)}</strong></td>
                       ${user.role==="admin"?`<td>${escapeHtml(author.building)}동 ${escapeHtml(author.unit)}호<br><span class="muted">${escapeHtml(author.name)}</span></td>`:""}
                       <td>${escapeHtml(c.location)}</td><td>${statusBadge(c.status)}</td><td>${fmtDate(c.createdAt)}</td>
@@ -999,7 +999,7 @@ export function mountApartmentPrototype(
             <div class="section-title"><div><h3>${householdBuildingFilter === "all" ? "전체 입주민 목록" : `${householdBuildingFilter}동 입주민 목록`}</h3><p>${residentStatusFilter === "active" || unitQuery ? `${residentStatusFilter === "active" ? "가입완료" : ""}${residentStatusFilter === "active" && unitQuery ? " · " : ""}${unitQuery ? `${escapeHtml(unitQuery)}호` : ""} 검색 결과` : "세대를 선택하면 가입상태와 상세 정보로 이동합니다."}</p></div><strong>${visibleHouseholds.length}세대</strong></div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>동</th><th>호수</th><th>전화번호 뒷자리</th><th>전입일</th><th>가입상태</th></tr></thead>
+                <thead><tr><th>동</th><th>호수</th><th>전화번호 뒷자리</th><th>전입일</th><th>가입상태</th><th>QR</th></tr></thead>
                 <tbody>
                   ${visibleHouseholds.length ? visibleHouseholds.map(household => {
                     const resident = household.currentResidentId ? state.users.find(user => user.id === household.currentResidentId) : null;
@@ -1016,8 +1016,9 @@ export function mountApartmentPrototype(
                       <td>${resident ? escapeHtml(resident.phoneLast4 || resident.phone?.slice(-4) || "-") : waiting ? escapeHtml(waiting.phoneLast4) : "-"}</td>
                       <td>${card?.moveInDate ? escapeHtml(card.moveInDate) : "미입력"}</td>
                       <td>${status}</td>
+                      <td><button class="btn btn-secondary btn-sm" type="button" data-qr-household="${household.id}">QR 보기</button></td>
                     </tr>`;
-                  }).join("") : '<tr><td colspan="5"><div class="empty-state">검색 결과가 없습니다.</div></td></tr>'}
+                  }).join("") : '<tr><td colspan="6"><div class="empty-state">검색 결과가 없습니다.</div></td></tr>'}
                 </tbody>
               </table>
             </div>
@@ -1042,7 +1043,7 @@ export function mountApartmentPrototype(
         const statusClass = resident ? "status-complete" : pendingRequest ? "status-pending" : "";
         return `
           <div class="resident-breadcrumb"><button class="link-button" data-route="adminResidents">입주민 현황</button><span>/</span><span>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호</span><span>/</span><strong>상세</strong></div>
-          <div class="page-head"><div><h2>입주민 카드</h2><p>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호의 관리 정보를 확인하고 수정합니다.</p></div><button class="btn btn-secondary" data-route="adminResidents">목록으로</button></div>
+          <div class="page-head"><div><h2>입주민 카드</h2><p>${escapeHtml(household.building)}동 ${escapeHtml(household.unit)}호의 관리 정보를 확인하고 수정합니다.</p></div><div class="page-head-actions"><button class="btn btn-outline" type="button" data-qr-household="${household.id}">세대 QR</button><button class="btn btn-secondary" data-route="adminResidents">목록으로</button></div></div>
           <div class="detail-layout">
             <section class="card">
               <div class="section-title"><div><h3>기본 정보</h3><p>세대 마스터와 회원 가입 정보입니다.</p></div><span class="status-pill ${statusClass}">${statusLabel}</span></div>
@@ -1097,6 +1098,44 @@ export function mountApartmentPrototype(
         if (!phone || phone.length !== 11) return phone;
         return `${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7)}`;
       }
+
+      async function openHouseholdQr(targetHouseholdId) {
+        const target = state.households.find(item => String(item.id) === String(targetHouseholdId));
+        if (!target?.qrCode) return toast("세대 QR 정보를 찾을 수 없습니다.");
+        const qrUrl = `${window.location.origin}/q/${target.qrCode}`;
+        modal(`
+          <div class="modal-head"><div><h3>${escapeHtml(target.building)}동 ${escapeHtml(target.unit)}호 세대 QR</h3><div class="muted" style="font-size:12px;">현재 접속 주소에 맞춰 생성된 QR입니다.</div></div><button class="close-btn" data-close-modal>✕</button></div>
+          <div class="modal-body qr-admin-modal">
+            <div class="spinner" id="qrAdminSpinner"></div>
+            <img id="qrAdminImage" alt="${escapeHtml(target.building)}동 ${escapeHtml(target.unit)}호 QR 코드" hidden />
+            <div class="qr-admin-address">${escapeHtml(qrUrl)}</div>
+            <div class="demo-box">QR만으로 로그인할 수 없으며 현재 입주민의 비밀번호가 필요합니다. QR이 외부에 노출되면 재발급하세요.</div>
+          </div>
+          <div class="modal-foot"><button class="btn btn-secondary" data-close-modal>닫기</button><button class="btn btn-danger" id="rotateHouseholdQrBtn">QR 재발급</button><a class="btn btn-primary" id="downloadHouseholdQr" download="${escapeHtml(target.building)}동-${escapeHtml(target.unit)}호-QR.png">QR 다운로드</a></div>
+        `);
+        try {
+          const { default: QRCode } = await import("qrcode");
+          const dataUrl = await QRCode.toDataURL(qrUrl, { width: 420, margin: 2, errorCorrectionLevel: "M" });
+          const image = document.getElementById("qrAdminImage");
+          image.src = dataUrl;
+          image.hidden = false;
+          document.getElementById("qrAdminSpinner").remove();
+          document.getElementById("downloadHouseholdQr").href = dataUrl;
+        } catch (error) {
+          handleError(error, "QR 이미지를 생성하지 못했습니다.");
+        }
+        document.getElementById("rotateHouseholdQrBtn").addEventListener("click", async () => {
+          if (!window.confirm("기존 QR은 즉시 사용할 수 없게 됩니다. 새 QR을 발급할까요?")) return;
+          try {
+            await rotateHouseholdQr(Number(target.id));
+            await refreshState();
+            openHouseholdQr(target.id);
+            toast("새 세대 QR을 발급했습니다.");
+          } catch (error) {
+            handleError(error, "QR을 재발급하지 못했습니다.");
+          }
+        });
+      }
   
       function bindRouteEvents() {
         document.querySelectorAll("[data-resident-building]").forEach(button => {
@@ -1125,10 +1164,20 @@ export function mountApartmentPrototype(
           residentStatusFilter = event.target.value;
           render();
         });
+        document.querySelectorAll("[data-qr-household]").forEach(button => {
+          button.addEventListener("click", event => {
+            event.stopPropagation();
+            openHouseholdQr(button.dataset.qrHousehold);
+          });
+        });
         document.querySelectorAll("[data-household-id]").forEach(row => {
           const openResident = () => navigate("adminResidentDetail", { householdId: row.dataset.householdId });
-          row.addEventListener("click", openResident);
+          row.addEventListener("click", event => {
+            if (event.target.closest("[data-qr-household]")) return;
+            openResident();
+          });
           row.addEventListener("keydown", event => {
+            if (event.target.closest("[data-qr-household]")) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               openResident();
@@ -1386,7 +1435,7 @@ export function mountApartmentPrototype(
         const statusOptions = Object.entries(STATUS).map(([key,s])=>`<option value="${key}" ${c.status===key?"selected":""}>${s.label}</option>`).join("");
         modal(`
           <div class="modal-head">
-            <div><h3>${escapeHtml(c.title)}</h3><div class="muted" style="font-size:12px;">민원번호 #${c.id}</div></div>
+            <div><h3>${escapeHtml(c.title)}</h3><div class="muted" style="font-size:12px;">민원번호 #${c.id}${c.source === "qr" ? " · QR 간편접수" : ""}</div></div>
             <button class="close-btn" data-close-modal>✕</button>
           </div>
           <div class="modal-body">

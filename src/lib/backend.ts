@@ -31,7 +31,7 @@ type ResidentRegistration = {
   password: string
 }
 
-async function invokeResidentFunction<T>(name: string, body: ResidentCredentials | ResidentRegistration) {
+async function invokeResidentFunction<T>(name: string, body: Record<string, unknown>) {
   const { data, error } = await client().functions.invoke(name, { body })
   if (error) {
     let message = error.message
@@ -65,6 +65,24 @@ export async function signIn(input: ResidentCredentials) {
     throw new Error('현재 입주민으로 승인된 계정이 아닙니다.')
   }
   return profile
+}
+
+export async function resolveHouseholdQr(qrCode: string) {
+  return invokeResidentFunction<{ building: number; unit: number }>('resident-qr-login', { action: 'resolve', qrCode })
+}
+
+export async function signInWithQr(qrCode: string, password: string) {
+  const session = await invokeResidentFunction<{ accessToken: string; refreshToken: string; residentId: string; householdId: number; building: number; unit: number }>(
+    'resident-qr-login',
+    { action: 'login', qrCode, password },
+  )
+  const { data, error } = await client().auth.setSession({
+    access_token: session.accessToken,
+    refresh_token: session.refreshToken,
+  })
+  if (error) throw error
+  if (!data.user || data.user.id !== session.residentId) throw new Error('QR 로그인 세션을 만들지 못했습니다.')
+  return session
 }
 
 export async function signInAdmin(email: string, password: string) {
@@ -181,17 +199,21 @@ export async function fetchAppState() {
   const residentCardsPromise = isAdminAccount
     ? client().from('resident_cards').select('*, resident_card_fields(*)')
     : Promise.resolve({ data: [], error: null })
+  const householdQrCodesPromise = isAdminAccount
+    ? client().from('household_qr_codes').select('*')
+    : Promise.resolve({ data: [], error: null })
 
-  const [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
+  const [profilesResult, householdsResult, registrationsResult, residentCardsResult, householdQrCodesResult, complaintsResult, noticesResult, recordsResult] = await Promise.all([
     profilesQuery,
     householdsPromise,
     registrationRequestsPromise,
     residentCardsPromise,
+    householdQrCodesPromise,
     client().from('complaints').select('*, complaint_comments(*), complaint_history(*)').order('created_at', { ascending: false }),
     client().from('notices').select('*, notice_history(*)').order('pinned', { ascending: false }).order('published_at', { ascending: false }),
     client().from('monthly_records').select('*, monthly_items(*)').order('month', { ascending: false }),
   ])
-  for (const result of [profilesResult, householdsResult, registrationsResult, residentCardsResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
+  for (const result of [profilesResult, householdsResult, registrationsResult, residentCardsResult, householdQrCodesResult, complaintsResult, noticesResult, recordsResult]) if (result.error) throw result.error
 
   const complaintPaths = (complaintsResult.data ?? []).map((row) => row.image_path).filter(Boolean)
   const complaintSignedUrls = new Map<string, string>()
@@ -243,12 +265,14 @@ export async function fetchAppState() {
       createdAt: formatDateTime(row.created_at),
     }
   })
+  const householdQrCodes = new Map((householdQrCodesResult.data ?? []).map((row) => [row.household_id, row.qr_code]))
   const households = (householdsResult.data ?? []).map((row) => ({
     id: row.id,
     building: String(row.building),
     unit: String(row.unit),
     area: Number(row.area_sqm),
     currentResidentId: row.current_resident_id,
+    qrCode: householdQrCodes.get(row.id) ?? '',
   }))
   const residentCards = (residentCardsResult.data ?? []).map((row) => ({
     residentId: row.resident_id,
@@ -269,7 +293,7 @@ export async function fetchAppState() {
     const history = (row.complaint_history ?? []) as HistoryRow[]
     return {
       id: row.id, authorId: row.author_id, title: row.title, category: row.category, location: row.location,
-      content: row.content, status: row.status, priority: row.priority, createdAt: formatDateTime(row.created_at),
+      content: row.content, status: row.status, priority: row.priority, source: row.source ?? 'app', createdAt: formatDateTime(row.created_at),
       updatedAt: formatDateTime(row.updated_at), image: row.image_path ? complaintSignedUrls.get(row.image_path) ?? '' : '',
       comments: comments.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ id: item.id, userId: item.user_id, text: item.body, createdAt: formatDateTime(item.created_at) })),
       history: history.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((item) => ({ status: item.status, date: formatDateTime(item.created_at), note: item.note })),
@@ -346,15 +370,25 @@ export async function deactivateResident(residentId: string) {
   return data as number
 }
 
-export async function createComplaint(input: { authorId: string; title: string; category: string; location: string; content: string; status: string; file?: File }) {
+export async function createComplaint(input: { authorId: string; title: string; category: string; location: string; content: string; status: string; source?: 'app' | 'qr'; file?: File }) {
   let imagePath: string | null = null
   if (input.file) {
     imagePath = `${input.authorId}/${crypto.randomUUID()}-${input.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const { error } = await client().storage.from('complaint-images').upload(imagePath, input.file)
     if (error) throw error
   }
-  const { error } = await client().from('complaints').insert({ author_id: input.authorId, title: input.title, category: input.category, location: input.location, content: input.content, status: input.status, image_path: imagePath })
+  const { data, error } = await client().from('complaints').insert({ author_id: input.authorId, title: input.title, category: input.category, location: input.location, content: input.content, status: input.status, source: input.source ?? 'app', image_path: imagePath }).select('id').single()
+  if (error) {
+    if (imagePath) await client().storage.from('complaint-images').remove([imagePath])
+    throw error
+  }
+  return data.id as number
+}
+
+export async function rotateHouseholdQr(householdId: number) {
+  const { data, error } = await client().rpc('rotate_household_qr', { target_household_id: householdId })
   if (error) throw error
+  return data as string
 }
 
 export async function addComplaintComment(complaintId: number, userId: string, body: string) {

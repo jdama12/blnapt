@@ -212,6 +212,29 @@
     }
     .page-head h2 { margin: 0 0 6px; font-size: 28px; letter-spacing: -.03em; }
     .page-head p { margin: 0; color: var(--muted); }
+    .page-head-actions { display: flex; gap: 9px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .qr-page {
+      min-height: 100vh; padding: 30px 16px; display: grid; place-items: center;
+      background: radial-gradient(circle at 20% 15%, rgba(59,130,246,.18), transparent 30%), linear-gradient(145deg, #eff6ff, #f8fafc 58%, #eef2ff);
+    }
+    .qr-flow-card { width: min(560px, 100%); padding: 30px; border: 1px solid rgba(255,255,255,.95); border-radius: 24px; background: rgba(255,255,255,.96); box-shadow: 0 24px 70px rgba(15,23,42,.14); }
+    .qr-brand { margin-bottom: 28px; }
+    .qr-flow-card h1 { margin: 22px 0 7px; font-size: 27px; letter-spacing: -.03em; }
+    .qr-flow-card .lead { margin: 0 0 22px; color: var(--muted); }
+    .qr-loading { min-height: 240px; }
+    .qr-household-badge { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 15px; border-radius: 14px; color: #1e3a8a; background: var(--primary-soft); }
+    .qr-household-badge span { font-size: 12px; font-weight: 700; color: var(--primary); }
+    .qr-error { margin: 0 0 14px; padding: 11px 12px; border-radius: 10px; color: #991b1b; background: #fef2f2; font-size: 13px; }
+    .qr-normal-login { margin-top: 10px; }
+    .qr-image-preview { display: block; margin: -3px 0 16px; }
+    .qr-image-preview img { width: 100%; height: auto; max-height: 420px; object-fit: contain; }
+    .qr-success { padding: 34px 0 12px; text-align: center; }
+    .qr-success-icon { width: 66px; height: 66px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--success); font-size: 32px; font-weight: 900; }
+    .qr-success p { margin: 0 0 24px; }
+    .qr-admin-modal { display: grid; justify-items: center; }
+    .qr-admin-modal img { width: min(360px, 100%); height: auto; }
+    .qr-admin-address { width: 100%; margin-top: 13px; padding: 10px; overflow-wrap: anywhere; border-radius: 10px; color: #475569; background: #f8fafc; font-size: 11px; text-align: center; }
 
     .grid { display: grid; gap: 18px; }
     .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -543,6 +566,8 @@
       .page-head { align-items: center; }
       .page-head h2 { font-size: 23px; }
       .page-head p { display: none; }
+      .qr-page { padding: 0; align-items: stretch; }
+      .qr-flow-card { min-height: 100vh; padding: 24px 20px; border-radius: 0; }
       .grid-3, .grid-2 { grid-template-columns: 1fr; }
       .bottom-nav {
         position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
