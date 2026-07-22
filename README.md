@@ -79,6 +79,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-house
 10. `202607210002_notice_history.sql`
 11. `202607220001_household_qr_complaints.sql`
 12. `202607220002_guest_qr_complaints.sql`
+13. `202607220003_claim_guest_complaints.sql`
 
 각 마이그레이션은 번호 순서대로 한 번만 실행합니다. 실행 후 검증 SQL:
 
