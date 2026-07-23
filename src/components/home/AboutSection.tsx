@@ -23,10 +23,10 @@ export default function AboutSection() {
           </ul>
         </div>
         <figure className="home-about-photo">
-          <img src={apartmentHero} alt="보라매롯데낙천대 단지와 조경 일러스트" loading="lazy" />
+          <img src={apartmentHero} alt="보라매롯데낙천대 단지와 조경" loading="lazy" />
           <figcaption>
             <strong>7개동 734세대</strong>
-            <span>보라매롯데낙천대 단지 일러스트</span>
+            <span>보라매롯데낙천대 단지</span>
           </figcaption>
         </figure>
       </div>
