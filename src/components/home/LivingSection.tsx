@@ -1,5 +1,16 @@
 import HomeIcon from './HomeIcon'
 import { livingItems } from './homeData'
+import parkIllustration from '../../assets/living-park.jpg'
+import transportIllustration from '../../assets/living-transport.jpg'
+import educationIllustration from '../../assets/living-education.jpg'
+import medicalIllustration from '../../assets/living-medical.jpg'
+
+const livingIllustrations = {
+  park: parkIllustration,
+  transport: transportIllustration,
+  education: educationIllustration,
+  medical: medicalIllustration,
+}
 
 export default function LivingSection() {
   return (
@@ -14,6 +25,7 @@ export default function LivingSection() {
           {livingItems.map((item) => (
             <article className="home-living-card" key={item.eyebrow}>
               <div className={`home-living-visual is-${item.icon}`} aria-hidden="true">
+                <img src={livingIllustrations[item.icon]} alt="" loading="lazy" />
                 <HomeIcon name={item.icon} />
                 <span>{item.eyebrow}</span>
               </div>

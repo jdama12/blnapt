@@ -119,18 +119,23 @@
 .home-living-card { overflow: hidden; background: #fff; box-shadow: 0 12px 35px rgba(26,37,49,.06); }
 .home-living-visual {
   position: relative; min-height: 220px; padding: 30px; display: flex; justify-content: space-between;
-  align-items: end; overflow: hidden; color: #fff; background: #435f58;
+  align-items: end; overflow: hidden; color: #fff; background: #25394d;
 }
 .home-living-visual::before {
-  content: ""; position: absolute; width: 280px; height: 280px; top: -115px; right: -70px;
-  border: 1px solid rgba(255,255,255,.25); border-radius: 50%;
-  box-shadow: 0 0 0 34px rgba(255,255,255,.035), 0 0 0 68px rgba(255,255,255,.025);
+  content: ""; position: absolute; z-index: 1; inset: 0;
+  background: linear-gradient(180deg, rgba(8,24,43,.03) 24%, rgba(8,24,43,.76) 100%);
 }
-.home-living-visual.is-transport { background: #38546e; }
-.home-living-visual.is-education { background: #806b51; }
-.home-living-visual.is-medical { background: #6c5962; }
-.home-living-visual svg { position: relative; z-index: 1; width: 88px; height: 88px; }
-.home-living-visual span { position: relative; z-index: 1; font-size: 11px; font-weight: 800; letter-spacing: .18em; opacity: .76; }
+.home-living-visual img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; transition: transform .45s ease; }
+.home-living-card:hover .home-living-visual img { transform: scale(1.025); }
+.home-living-visual svg {
+  position: relative; z-index: 2; width: 82px; height: 82px; padding: 14px;
+  border: 1px solid rgba(255,255,255,.34); border-radius: 50%; background: rgba(8,24,43,.48);
+  backdrop-filter: blur(5px);
+}
+.home-living-visual span {
+  position: relative; z-index: 2; padding: 5px 9px; border-radius: 2px;
+  font-size: 11px; font-weight: 800; letter-spacing: .18em; background: rgba(8,24,43,.62);
+}
 .home-living-card > div:last-child { min-height: 195px; padding: 29px 31px; }
 .home-living-card small { color: #718091; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
 .home-living-card h3 { margin: 8px 0 8px; color: var(--home-navy); font-size: 25px; letter-spacing: -.035em; }
