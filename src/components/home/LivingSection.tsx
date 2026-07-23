@@ -1,4 +1,4 @@
-import ImagePlaceholder from './ImagePlaceholder'
+import HomeIcon from './HomeIcon'
 import { livingItems } from './homeData'
 
 export default function LivingSection() {
@@ -13,7 +13,10 @@ export default function LivingSection() {
         <div className="home-living-grid">
           {livingItems.map((item) => (
             <article className="home-living-card" key={item.eyebrow}>
-              <ImagePlaceholder label={`${item.title} 사진`} variant="card" />
+              <div className={`home-living-visual is-${item.icon}`} aria-hidden="true">
+                <HomeIcon name={item.icon} />
+                <span>{item.eyebrow}</span>
+              </div>
               <div>
                 <small>{item.eyebrow}</small>
                 <h3>{item.title}</h3>

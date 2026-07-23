@@ -12,11 +12,11 @@ export const complexStats = [
 ]
 
 export const livingItems = [
-  { eyebrow: 'PARK', title: '보라매공원', description: '도심 가까이에서 산책과 휴식을 누리는 쾌적한 공원 생활권' },
-  { eyebrow: 'TRANSPORT', title: '편리한 교통환경', description: '주요 업무지구와 생활권을 편리하게 연결하는 대중교통 환경' },
-  { eyebrow: 'EDUCATION', title: '교육환경', description: '일상 가까이에서 이용할 수 있는 안정적인 교육시설 접근성' },
-  { eyebrow: 'MEDICAL', title: '의료환경', description: '보라매병원을 비롯한 생활권 내 의료시설의 편리한 접근성' },
-]
+  { icon: 'park', eyebrow: 'PARK', title: '보라매공원', description: '도심 가까이에서 산책과 휴식을 누리는 쾌적한 공원 생활권' },
+  { icon: 'transport', eyebrow: 'TRANSPORT', title: '편리한 교통환경', description: '주요 업무지구와 생활권을 편리하게 연결하는 대중교통 환경' },
+  { icon: 'education', eyebrow: 'EDUCATION', title: '교육환경', description: '일상 가까이에서 이용할 수 있는 안정적인 교육시설 접근성' },
+  { icon: 'medical', eyebrow: 'MEDICAL', title: '의료환경', description: '보라매병원을 비롯한 생활권 내 의료시설의 편리한 접근성' },
+] as const
 
 export const newsItems = [
   { date: '2026.07', title: '엘리베이터 게시판 설치 의견수렴' },

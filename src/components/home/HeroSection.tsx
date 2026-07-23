@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
-import ImagePlaceholder from './ImagePlaceholder'
+import apartmentHero from '../../assets/apartment-hero.jpg'
 
 export default function HeroSection() {
   return (
     <section className="home-hero" id="top">
-      <div className="home-hero-media"><ImagePlaceholder label="아파트 전경 사진" variant="hero" /></div>
+      <div className="home-hero-media" aria-hidden="true">
+        <img src={apartmentHero} alt="" />
+      </div>
       <div className="home-hero-shade" aria-hidden="true" />
       <div className="home-container home-hero-content">
         <p className="home-eyebrow is-light">BORAMAE LOTTE NAKCHEONDAE</p>

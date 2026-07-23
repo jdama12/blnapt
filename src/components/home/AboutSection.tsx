@@ -1,4 +1,4 @@
-import ImagePlaceholder from './ImagePlaceholder'
+import apartmentHero from '../../assets/apartment-hero.jpg'
 
 const aboutPoints = [
   '보라매공원 생활권',
@@ -22,7 +22,13 @@ export default function AboutSection() {
             {aboutPoints.map((point, index) => <li key={point}><span>{String(index + 1).padStart(2, '0')}</span>{point}</li>)}
           </ul>
         </div>
-        <ImagePlaceholder label="단지 조경 및 외관 사진" />
+        <figure className="home-about-photo">
+          <img src={apartmentHero} alt="보라매롯데낙천대 101동과 103동 전경" loading="lazy" />
+          <figcaption>
+            <strong>7개동 734세대</strong>
+            <span>보라매롯데낙천대 단지 전경</span>
+          </figcaption>
+        </figure>
       </div>
     </section>
   )
