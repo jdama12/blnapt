@@ -7,6 +7,7 @@ import AdminResidentsPage from './pages/AdminResidentsPage'
 import ComplaintsPage from './pages/ComplaintsPage'
 import DashboardPage from './pages/DashboardPage'
 import FeesPage from './pages/FeesPage'
+import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import MyPage from './pages/MyPage'
 import NoticesPage from './pages/NoticesPage'
@@ -16,7 +17,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
