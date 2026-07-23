@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import apartmentHero from '../../assets/apartment-hero.jpg'
+import apartmentHero from '../../assets/apartment-hero-illustration.jpg'
 
 export default function HeroSection() {
   return (
