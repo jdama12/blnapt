@@ -40,4 +40,4 @@ export const externalLinks = [
 ]
 
 export const naverMapUrl =
-  'https://fin.land.naver.com/map?center=3zeKUf-2AJ21E&zoom=15&layer=NobwRAlgJmBcYGMD2BbADgGwKYA8D6UWALgIYQZgA0YaJATiSgM5zjLrY4CSM8AzHwAcANjABfakyz0EACwAK9Ri1jhSAIziJUmXAFoIAOwBmScWIC6QA'
+  'https://naver.me/56X2iaMx'
