@@ -8,9 +8,12 @@ import LivingSection from '../components/home/LivingSection'
 import LocationSection from '../components/home/LocationSection'
 import NewsSection from '../components/home/NewsSection'
 import ResidentServiceSection from '../components/home/ResidentServiceSection'
+import useHomeScrollReveal from '../components/home/useHomeScrollReveal'
 import './HomePage.css'
 
 export default function HomePage() {
+  useHomeScrollReveal()
+
   return (
     <div className="public-home">
       <a className="home-skip-link" href="#home-main">본문으로 바로가기</a>
