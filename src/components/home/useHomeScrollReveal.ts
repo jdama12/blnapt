@@ -9,7 +9,7 @@ const revealItemSelector = [
   '.home-section-heading > *',
   '.home-living-card',
   '.home-location-copy > *',
-  '.home-map-viewport',
+  '.home-map-preview',
   '.home-news-list > article',
   '.home-resident-inner > div > *',
   '.home-resident-inner > ul > li',
