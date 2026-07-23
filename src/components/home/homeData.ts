@@ -19,10 +19,7 @@ export const livingItems = [
 ] as const
 
 export const newsItems = [
-  { date: '2026.07', title: '엘리베이터 게시판 설치 의견수렴' },
-  { date: '2026.07', title: '옥상 및 배수시설 집중점검' },
-  { date: '2026.07', title: '장기 방치 자전거 일괄정리 안내' },
-  { date: '2026.06', title: '공동주택 관리 실태조사 실시' },
+  { date: '2026.06', title: '엘리베이터 새단장 완료' },
 ]
 
 export const residentServices = ['민원접수', '처리현황', '생활공지', '시설안내']
