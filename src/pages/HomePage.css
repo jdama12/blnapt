@@ -53,7 +53,7 @@
 .home-wordmark > span:last-child { display: grid; line-height: 1.25; }
 .home-wordmark strong { color: var(--home-navy); font-size: 19px; letter-spacing: -.03em; }
 .home-wordmark small { margin-top: 3px; color: #7b8490; font-size: 8px; letter-spacing: .1em; }
-.home-logo-mark { width: 46px; height: 46px; display: block; flex: 0 0 auto; }
+.home-logo-mark { width: 48px; height: 48px; display: block; flex: 0 0 auto; object-fit: contain; }
 .home-desktop-nav { display: flex; justify-content: center; align-items: center; gap: clamp(22px, 3vw, 42px); }
 .home-desktop-nav a { position: relative; padding: 28px 0 25px; color: #364454; font-size: 15px; font-weight: 700; }
 .home-desktop-nav a::after { content: ""; position: absolute; right: 50%; bottom: 19px; left: 50%; height: 2px; background: var(--home-navy); transition: .2s; }
@@ -303,7 +303,7 @@
   .home-living-card > div:last-child { min-height: auto; padding: 24px; }
   .home-map-placeholder { min-height: 360px; }
   .home-section-heading.is-row { align-items: start; flex-direction: column; gap: 8px; }
-  .home-news-list article { min-height: 100px; grid-template-columns: 35px 1fr 24px; gap: 10px; }
+  .home-news-list article { min-height: 100px; grid-template-columns: 55px 1fr 24px; gap: 10px; }
   .home-news-list article > span { display: none; }
   .home-news-list time { grid-column: 1; grid-row: 1; }
   .home-news-list h3 { grid-column: 2; font-size: 17px; }
