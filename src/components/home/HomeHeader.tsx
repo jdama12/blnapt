@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { navigationItems } from './homeData'
+import HomeLogoMark from './HomeLogoMark'
+import ResidentLoginLink from './ResidentLoginLink'
 
 export default function HomeHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -23,7 +24,7 @@ export default function HomeHeader() {
     <header className="home-header">
       <div className="home-container home-header-inner">
         <a className="home-wordmark" href="#top" aria-label="보라매롯데낙천대 홈페이지 처음으로">
-          <span className="home-wordmark-symbol" aria-hidden="true"><i /><i /><i /></span>
+          <HomeLogoMark />
           <span><strong>보라매롯데낙천대</strong><small>BORAMAE LOTTE NAKCHEONDAE</small></span>
         </a>
 
@@ -31,7 +32,7 @@ export default function HomeHeader() {
           {navigationItems.map((item) => <a key={item.href} href={item.href}>{item.label}</a>)}
         </nav>
 
-        <Link className="home-login-button home-desktop-login" to="/login">입주민 로그인</Link>
+        <ResidentLoginLink className="home-login-button home-desktop-login">입주민 로그인</ResidentLoginLink>
         <button
           className={`home-menu-toggle${menuOpen ? ' is-open' : ''}`}
           type="button"
@@ -59,7 +60,9 @@ export default function HomeHeader() {
             {navigationItems.map((item) => (
               <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)}>{item.label}<span>›</span></a>
             ))}
-            <Link className="home-login-button" to="/login" onClick={() => setMenuOpen(false)}>입주민 로그인</Link>
+            <ResidentLoginLink className="home-login-button" onNavigate={() => setMenuOpen(false)}>
+              입주민 로그인
+            </ResidentLoginLink>
           </nav>
         </div>
       )}

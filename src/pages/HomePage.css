@@ -53,17 +53,22 @@
 .home-wordmark > span:last-child { display: grid; line-height: 1.25; }
 .home-wordmark strong { color: var(--home-navy); font-size: 19px; letter-spacing: -.03em; }
 .home-wordmark small { margin-top: 3px; color: #7b8490; font-size: 8px; letter-spacing: .1em; }
-.home-wordmark-symbol { width: 39px; height: 42px; display: flex; align-items: end; gap: 3px; }
-.home-wordmark-symbol i { width: 10px; display: block; border: 2px solid var(--home-navy); border-bottom-width: 4px; }
-.home-wordmark-symbol i:nth-child(1) { height: 28px; }
-.home-wordmark-symbol i:nth-child(2) { height: 39px; }
-.home-wordmark-symbol i:nth-child(3) { height: 32px; }
+.home-logo-mark { width: 46px; height: 46px; display: block; flex: 0 0 auto; }
 .home-desktop-nav { display: flex; justify-content: center; align-items: center; gap: clamp(22px, 3vw, 42px); }
 .home-desktop-nav a { position: relative; padding: 28px 0 25px; color: #364454; font-size: 15px; font-weight: 700; }
 .home-desktop-nav a::after { content: ""; position: absolute; right: 50%; bottom: 19px; left: 50%; height: 2px; background: var(--home-navy); transition: .2s; }
 .home-desktop-nav a:hover::after { right: 0; left: 0; }
 .home-login-button { color: #fff !important; background: var(--home-navy); }
 .home-login-button:hover { background: var(--home-navy-2); }
+.home-service-notice {
+  position: fixed; z-index: 500; right: 24px; bottom: 24px; width: min(360px, calc(100% - 32px));
+  padding: 17px 20px; display: grid; gap: 3px; border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px; color: #fff; background: #10233f; box-shadow: 0 16px 44px rgba(5,15,29,.28);
+  animation: home-notice-in .22s ease-out;
+}
+.home-service-notice strong { font-size: 16px; }
+.home-service-notice span { color: rgba(255,255,255,.74); font-size: 13px; }
+@keyframes home-notice-in { from { opacity: 0; transform: translateY(12px); } }
 .home-menu-toggle { display: none; }
 .home-mobile-menu-backdrop { display: none; }
 
@@ -269,8 +274,8 @@
   .home-container { width: calc(100% - 32px); }
   .home-wordmark strong { font-size: 17px; }
   .home-wordmark small { display: none; }
-  .home-wordmark-symbol { width: 34px; height: 37px; }
-  .home-wordmark-symbol i { width: 9px; }
+  .home-logo-mark { width: 40px; height: 40px; }
+  .home-service-notice { right: 16px; bottom: 16px; }
   .home-section { padding: 70px 0; }
   .home-eyebrow { margin-bottom: 12px; font-size: 11px; }
   .home-hero { min-height: calc(100svh - 70px); }

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import apartmentHero from '../../assets/apartment-hero-illustration.jpg'
+import ResidentLoginLink from './ResidentLoginLink'
 
 export default function HeroSection() {
   return (
@@ -15,7 +15,7 @@ export default function HeroSection() {
         <address>서울특별시 동작구 여의대방로10길 38</address>
         <div className="home-hero-actions">
           <a className="home-primary-button" href="#about">단지 둘러보기</a>
-          <Link className="home-secondary-button is-light" to="/login">입주민 생활지원</Link>
+          <ResidentLoginLink className="home-secondary-button is-light">입주민 생활지원</ResidentLoginLink>
         </div>
       </div>
     </section>
